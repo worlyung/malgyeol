@@ -4,7 +4,7 @@
 
 ## 말결 1.00 다운로드
 
-[GitHub Releases](https://github.com/worlyung/malgyeol/releases/latest)에서 `말결_1.00_설치.exe`를 받습니다.
+[GitHub Releases](https://github.com/worlyung/malgyeol/releases/latest)에서 `Malgyeol-1.00-Setup.exe`를 받습니다.
 Windows 11용이며 Python과 음성인식 모델이 포함되어 있습니다. 설치 후 말결 바로가기로 실행합니다.
 개인 명부, 용어집, 녹음, 얼굴·목소리 특징과 API 키는 배포본에 포함하지 않습니다.
 

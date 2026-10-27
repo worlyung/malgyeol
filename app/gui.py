@@ -70,7 +70,7 @@ def wait_until_ready(port: int, timeout: float = 30.0) -> bool:
 def main() -> int:
     ensure_output_streams()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s",
-                        datefmt="%H:%M:%S")
+                        datefmt="%H:%M:%S", force=True)
     cfg = config.load()
     if cfg["asr"].get("low_priority", True):
         set_low_priority()

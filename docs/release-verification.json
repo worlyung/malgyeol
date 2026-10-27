@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-27",
+  "product": "말결",
+  "version": "1.00",
+  "asset": "Malgyeol-1.00-Setup.exe",
+  "bytes": 1894839170,
+  "sha256": "e98f1237f9c497019c6cc216ecba1da707f2c11e32d2c298a98772aa91fc04db",
+  "checks": {
+    "windows_installer_opened": true,
+    "clean_install_completed": true,
+    "update_install_completed": true,
+    "native_app_title_malgyeol_1_00": true,
+    "ui_version_1_00_connected": true,
+    "settings_navigation": true,
+    "normal_exit_and_port_closed": true,
+    "windows_registered_version_1_00": true,
+    "desktop_shortcut_points_to_installation": true,
+    "startup_logging_warning_fixed": true,
+    "bundled_whisper_cpu_int8_load": true,
+    "runtime_payload_matches_source": true,
+    "payload_sensitive_data_scan_issues": 0,
+    "unit_tests_passed": 14,
+    "github_asset_digest_matches_local": true
+  },
+  "screenshot": "installed-malgyeol-1.00.png",
+  "not_tested": ["실시간 음성 받아쓰기 품질", "외부 AI 실제 호출", "다른 PC 및 GPU에서 실행"]
+}
