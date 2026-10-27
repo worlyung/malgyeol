@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="160" viewBox="0 0 600 160">
+<title>말결 — 대화를 기록으로 잇다</title>
+<g transform="translate(8 16) scale(2)"><rect width="64" height="64" rx="17" fill="#24664b"/>
+<path d="M21 16h22a7 7 0 0 1 7 7v16a7 7 0 0 1-7 7H29l-10 7v-8a7 7 0 0 1-5-6V23a7 7 0 0 1 7-7Z" fill="none" stroke="#f7faf4" stroke-width="3" stroke-linejoin="round"/>
+<path d="M24 28v8m8-13v18m8-11v4" fill="none" stroke="#f7faf4" stroke-width="3.5" stroke-linecap="round"/></g>
+<text x="168" y="88" fill="#203e30" font-family="Pretendard, Malgun Gothic, sans-serif" font-size="68" font-weight="700" letter-spacing="-3">말결</text>
+<text x="171" y="124" fill="#627168" font-family="Pretendard, Malgun Gothic, sans-serif" font-size="20">대화를 기록으로 잇다</text></svg>

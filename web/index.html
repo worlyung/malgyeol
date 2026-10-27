@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>말결 · 대화를 기록으로 잇다</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<a class="skip-link" href="#tab-live">본문으로 건너뛰기</a>
+<header class="appbar">
+  <div class="brand">
+    <img class="brand-mark" src="/static/brand-icon.svg" width="38" height="38" alt="">
+    <div class="brand-text">
+      <h1>말결</h1><span class="brand-sub">MALGYEOL</span>
+    </div>
+  </div>
+  <span class="nav-label">워크스페이스</span>
+  <nav class="tabs" aria-label="주 메뉴">
+    <button class="tab active" data-tab="live" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg><span>받아쓰기</span><i class="nav-live-dot"></i></button>
+    <button class="tab" data-tab="archive"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6l2 2h8v13H4zM8 12h8m-8 4h5"/></svg><span>기록·요약</span></button>
+    <button class="tab" data-tab="glossary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v16H4zM14 4h6v16h-6zM7 8h1m9 0h1"/></svg><span>용어집</span></button>
+    <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>설정</span></button>
+  </nav>
+  <div class="nav-note"><span class="local-dot"></span> 내 PC에서 받아쓰기<small>회의 음성을 로컬에 기록합니다.</small></div>
+  <div class="appbar-end">
+    <span id="appVersion" class="version"></span>
+    <div id="conn" class="badge off">연결 끊김</div>
+  </div>
+</header>
+<div class="workspace-bar"><div><span class="eyebrow">회의 워크스페이스</span><b id="workspaceTitle">받아쓰기</b></div><span class="workspace-tip">대화에 집중하세요. 기록은 여기서.</span><button id="helpBtn" class="quiet">사용 안내 <kbd>?</kbd></button></div>
+
+<div id="restartBar" class="update-bar restart-bar hidden">
+  <span>프로그램 파일이 새로 바뀌었습니다. 새 기능이 제대로 동작하려면 <b>프로그램을 껐다가 다시 켜 주세요.</b></span>
+</div>
+
+<div id="updateBar" class="update-bar hidden">
+  <span id="updateText"></span>
+  <button id="updateGet" class="mini primary">새 버전 받기</button>
+  <button id="updateSkip" class="mini">이 버전은 넘어가기</button>
+</div>
+
+<!-- ───────────────────────── 받아쓰기 ───────────────────────── -->
+<main id="tab-live" class="tabpane active">
+  <div class="section-heading"><div><h2>말하는 순간, 기록이 됩니다.</h2><p>소리를 선택하고 받아쓰기를 시작하세요.</p></div><span class="step-label">01 준비 <span>→</span> 02 기록 <span>→</span> 03 검수</span></div>
+  <section class="deck">
+    <div class="orb-wrap">
+      <button id="startBtn" class="orb" title="받아쓰기 시작" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+        <span>받아쓰기 시작</span>
+      </button>
+      <button id="stopBtn" class="orb live hidden" title="중지">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2.5" class="fill"/></svg>
+        <span>마치고 저장</span>
+      </button>
+      <span class="record-note">기록은 자동으로 저장됩니다</span>
+    </div>
+
+    <div class="deck-main">
+      <div class="deck-title">
+        <label class="field grow">회의 제목<input id="title" placeholder="어떤 회의를 기록할까요?"></label>
+        <span id="status" class="status" role="status">시작 전</span>
+      </div>
+      <div class="deck-fields">
+        <label class="field">소리 가져오기
+          <select id="source">
+            <option value="loopback">PC 소리(스피커)</option>
+            <option value="microphone">마이크</option>
+            <option value="file">파일·영상 주소</option>
+          </select>
+        </label>
+        <label class="field grow" id="deviceField">장치
+          <select id="device"></select>
+        </label>
+        <span id="filePick" class="file-pick hidden">
+          <label class="field">파일<input type="file" id="fileInput" accept="audio/*,video/*"></label>
+          <label class="field grow">또는 영상 주소<input id="fileUrl" placeholder="mp4 주소 붙여넣기"></label>
+          <label class="field">시작(초)<input id="startSec" type="number" min="0" placeholder="0" class="w-num"></label>
+        </span>
+      </div>
+      <p id="sourceHint" class="source-hint">PC에서 재생되는 회의·영상 소리를 받아씁니다.</p>
+    </div>
+  </section>
+
+  <div class="split">
+    <section class="transcript-pane panel">
+      <div class="pane-head">
+        <b class="pane-title">녹취록</b>
+        <span id="segCount" class="count">0문장</span>
+        <label class="check"><input type="checkbox" id="autoscroll" checked> 자동 스크롤</label>
+        <span class="spacer"></span>
+        <div class="find" data-find="#transcript" role="search">
+          <input type="search" placeholder="녹취록 검색" aria-label="녹취록 검색" autocomplete="off">
+          <span class="find-count" aria-live="polite"></span>
+          <button type="button" class="find-btn" data-dir="-1" title="이전 (Shift+Enter)" aria-label="이전 결과">▲</button>
+          <button type="button" class="find-btn" data-dir="1" title="다음 (Enter)" aria-label="다음 결과">▼</button>
+        </div>
+        <details class="export-menu"><summary>내보내기 <span>↓</span></summary><div class="export-options"><button data-export="docx">Word 문서 <small>DOCX</small></button><button data-export="txt">텍스트 <small>TXT</small></button><button data-export="srt">영상 자막 <small>SRT</small></button><button data-export="md">마크다운 <small>MD</small></button><button data-export="json">전체 데이터 <small>JSON</small></button></div></details>
+      </div>
+      <div class="spk-bar" data-scope="live">
+        <span class="spk-label">화자 구분</span>
+        <button type="button" class="spk-toggle t-face" data-mode="face" aria-pressed="true" title="화면에 크게 잡힌 얼굴로 화자를 정합니다">얼굴</button>
+        <button type="button" class="spk-toggle t-voice" data-mode="voice" aria-pressed="true" title="등록된 성문과 목소리 묶음으로 화자를 정합니다">목소리</button>
+        <button type="button" class="spk-toggle t-context" data-mode="context" aria-pressed="true" title="자기소개(‘… 홍길동 의원입니다’)와 사회자의 지명(‘○○○ 위원님 질의해 주시기 바랍니다’)을 보고 화자를 정합니다. AI 키가 없어도 됩니다.">맥락</button>
+        <span class="spk-hint">끄고 켜면 녹취록에 바로 반영됩니다</span>
+      </div>
+      <div id="livePlayerSlot"></div>
+      <div id="transcript" class="transcript" aria-label="실시간 녹취록" tabindex="0"></div>
+      <div class="caption-dock">
+        <div id="partial" class="partial"></div>
+        <div class="preview-settings">
+          <label class="field-inline">성능
+            <select id="setPerf">
+              <option value="balanced">보통 — PC 속도에 맞춰 미리보기 (권장)</option>
+              <option value="low">절전 — 말이 끊길 때만 인식</option>
+            </select>
+          </label>
+          <span class="hint" id="perfHint"></span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="회의 도구">
+      <div class="side-heading"><b>회의 도구</b><span>필요한 만큼 준비하세요</span></div>
+      <div class="tool-tabs" role="tablist" aria-label="회의 도구 선택"><button role="tab" aria-selected="true" data-tool="prepare">회의 준비</button><button role="tab" aria-selected="false" data-tool="speaker">화자 확인</button><button role="tab" aria-selected="false" data-tool="notes">메모·알림</button></div>
+      <div class="card tool-panel hidden" data-tool-panel="speaker">
+        <div class="card-head">
+          <b>화면 속 발언자</b>
+          <span class="spacer"></span>
+          <label class="switch"><input type="checkbox" id="faceToggle"><span></span> 화면 감시</label>
+        </div>
+        <label class="field">감시할 모니터
+          <select id="setMonitor"></select>
+        </label>
+        <div class="region-row">
+          <span class="region-label">감시 영역 <b id="regionLabel">모니터 전체</b></span>
+          <span class="spacer"></span>
+          <button id="pickRegion" class="mini">드래그로 지정</button>
+          <button id="clearRegion" class="mini">전체</button>
+        </div>
+        <div id="facePreviewWrap"><img id="facePreview" alt="화면 감시 미리보기"><div class="face-placeholder">화면 감시를 켜면<br>발언자 화면이 여기에 표시됩니다.</div></div>
+        <div id="faceNow" class="face-now">대기 중</div>
+        <div id="faceErr" class="err"></div>
+        <button id="captureFaces" class="primary block" disabled>지금 화면에 나오는 얼굴 캡처</button>
+        <div class="hint">
+          중계 화면에 발언자가 크게 보일 때 누르세요. 잡힌 얼굴에 이름을 붙여 두면
+          다음부터 그 사람이 나올 때 자동으로 화자 이름이 붙습니다.
+        </div>
+        <div id="faceCandidates" class="faces"></div>
+      </div>
+
+      <div class="card tool-panel hidden" data-tool-panel="notes">
+        <div class="card-head"><b>정정 메모</b></div>
+        <textarea id="memo" rows="4" placeholder="회의 중에 떠오르는 대로 적어 두세요&#10;예) 지리 아니고 질의 / 최정 의원 아니고 최정의&#10;화자 2는 강신원 연수문화재단 대표이사"></textarea>
+        <div class="hint">받아쓰기를 마치면 AI가 메모대로 녹취록 전체를 한 번에 고칩니다. 고치기 전 녹취록도 따로 남겨 둡니다.</div>
+      </div>
+
+      <div class="card tool-panel" data-tool-panel="prepare">
+        <div class="card-head">
+          <b>회의 자료 <span id="materialCount" class="count"></span></b>
+          <span class="spacer"></span>
+          <button id="materialClear" class="hidden">비우기</button>
+        </div>
+        <input type="file" id="materialInput" multiple accept=".pdf,.md">
+        <div id="materialTerms" class="kw-chips"></div>
+        <div class="hint" id="materialHint">안건·업무보고·명단 같은 자료를 <b>PDF나 MD</b>로 넣으면 AI가 이름·직함·사업명을 뽑아 용어집에 넣습니다. 받아쓰는 동안 비슷하게 들린 말을 바로 고치고, 끝날 때 한 번 더 대조합니다.<br>
+          HWP·HWPX·DOCX·PPT·XLS 파일은 PDF나 MD로 저장해 넣어 주세요. PDF는 <b>2쪽 모아 보기 말고 1쪽씩</b> 저장해야 인식률이 더 좋아집니다.</div>
+      </div>
+
+      <div class="card tool-panel hidden" id="kwCard" data-tool-panel="notes">
+        <div class="card-head">
+          <b>관심 키워드 <span id="kwCount" class="count"></span></b>
+          <span class="spacer"></span>
+          <label class="check" title="프로그램 창이 가려져 있어도 Windows 알림으로 알려 줍니다"><input type="checkbox" id="kwNotify"> 알림</label>
+        </div>
+        <div class="row">
+          <input id="kwInput" placeholder="담당 사업명·부서명 (Enter로 추가)" autocomplete="off">
+          <button id="kwAdd">추가</button>
+        </div>
+        <div id="kwChips" class="kw-chips"></div>
+        <div class="hint">발언에 키워드가 나오면 알려 주고 녹취록에 형광펜으로 표시합니다. 띄어쓰기가 달라도 찾습니다.</div>
+        <div id="kwHits" class="kw-hits"></div>
+      </div>
+
+      <div class="card tool-panel" data-tool-panel="prepare">
+        <div class="card-head"><b>빠른 용어 추가</b></div>
+        <div class="row">
+          <input id="quickTerm" placeholder="이름 또는 용어">
+          <button id="quickAdd">추가</button>
+        </div>
+        <div class="hint">이름·기관명·사업명을 넣으면 다음 인식부터 교정에 반영됩니다.</div><button class="text-link" data-go="glossary">용어집에서 관리하기 →</button>
+      </div>
+
+    </aside>
+  </div>
+</main>
+
+<!-- ───────────────────────── 용어집 ───────────────────────── -->
+<main id="tab-glossary" class="tabpane">
+  <div class="page">
+    <div class="page-head">
+      <h2>우리 회의의 언어를 알려주세요.</h2>
+      <p>이름과 전문 용어를 등록해 두면, 잘못 들은 말을 더 정확하게 고칩니다.</p>
+    </div>
+    <div class="page-grid">
+      <section class="card">
+        <div class="card-head"><b>새 용어 등록</b><span class="count">여러 개를 한 번에</span></div>
+        <textarea id="bulkTerms" rows="3" placeholder="줄바꿈 또는 쉼표로 구분해서 붙여넣기&#10;예) 김철수, 이영희, 예산결산특별위원회, 도정질문"></textarea>
+        <div class="row">
+          <select id="bulkCategory">
+            <option value="의원">의원 이름</option>
+            <option value="용어">의회 용어</option>
+            <option value="지명">지명·기관</option>
+            <option value="기타">기타</option>
+          </select>
+          <span class="spacer"></span>
+          <button id="bulkAdd" class="primary">추가</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><b>자동으로 바꿀 표현</b></div>
+        <div class="row">
+          <label class="field grow">찾을 말 (잘못 인식되는 표현)<input id="repFrom" type="text" placeholder="예) 예산결산특위원회" autocomplete="off"></label>
+          <label class="field grow">바꿀 말 (바른 표기)<input id="repTo" type="text" placeholder="예) 예산결산특별위원회" autocomplete="off"></label>
+        </div>
+        <div class="row">
+          <span class="hint">추가하면 바로 저장됩니다. 같은 '찾을 말'이 있으면 '바꿀 말'만 새것으로 바꿉니다.</span>
+          <span class="spacer"></span>
+          <button id="repAdd" class="primary">추가</button>
+        </div>
+      </section>
+
+      <section class="card span-2 glossary-library">
+        <div class="card-head">
+          <b>등록된 용어·교정 규칙</b>
+          <span class="spacer"></span>
+          <button id="viewTerms">전체 목록 열기 ↗</button>
+        </div>
+        <div class="stat" id="termSummary"></div>
+        <div class="row">
+          <input id="glossFind" class="grow" type="search" autocomplete="off"
+                 placeholder="찾아서 고치기·지우기 — 용어나 바꾸기 규칙의 낱말을 입력하세요 (예: 위원회)">
+        </div>
+        <div id="glossFound" class="gloss-found"></div>
+        <div class="hint">
+          용어와 바꾸기 규칙이 많아 화면에 다 보여 주지 않습니다. [보기]를 누르면 분류별 용어와
+          바꾸기 규칙 전체가 정리된 텍스트 파일이 새 창에 열립니다.
+          잘못 만든 규칙이나 용어는 위 칸에서 찾아 고치거나 지우세요(바로 저장됩니다).
+          바꾸기 규칙은 긴 것부터 적용하고, 4글자 이하 짧은 규칙은 앞 글자가 한글이면 건너뜁니다("핵심 사업"이 망가지지 않도록).
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<!-- ───────────────────────── 기록·요약 ───────────────────────── -->
+<main id="tab-archive" class="tabpane">
+  <div class="section-heading"><div><h2>회의의 다음 단계.</h2><p>지난 기록을 듣고, 다듬고, 필요한 문서로 정리하세요.</p></div><button data-go="live" class="primary">+ 새 받아쓰기</button></div>
+  <div class="split">
+    <section class="panel list-pane">
+      <div class="pane-head"><b class="pane-title">내 회의 <span id="sessionCount" class="count"></span></b><span class="spacer"></span><button id="refreshSessions" class="mini">새로고침</button></div>
+      <label class="session-search"><span class="sr-only">회의 제목 검색</span><input type="search" id="sessionSearch" placeholder="회의 제목으로 찾기" autocomplete="off"></label>
+      <div id="folderList" class="folders"></div>
+      <div id="sessionList" class="sessions"></div>
+    </section>
+    <section class="panel grow archive-pane">
+      <div class="pane-head">
+        <b id="archTitle" class="pane-title">회의를 선택하세요</b>
+        <span class="spacer"></span>
+        <div class="find" data-find="#archTranscript" role="search">
+          <input type="search" placeholder="녹취록 검색" aria-label="녹취록 검색" autocomplete="off">
+          <span class="find-count" aria-live="polite"></span>
+          <button type="button" class="find-btn" data-dir="-1" title="이전 (Shift+Enter)" aria-label="이전 결과">▲</button>
+          <button type="button" class="find-btn" data-dir="1" title="다음 (Enter)" aria-label="다음 결과">▼</button>
+        </div>
+        <details class="export-menu"><summary>내보내기 <span>↓</span></summary><div class="export-options"><button data-aexport="docx">Word 문서 <small>DOCX</small></button><button data-aexport="txt">텍스트 <small>TXT</small></button><button data-aexport="srt">영상 자막 <small>SRT</small></button><button data-aexport="md">마크다운 <small>MD</small></button></div></details>
+        <button id="summaryBtn" class="primary ai">AI 요약</button>
+      </div>
+      <details id="meetInfo" class="meeting-details hidden"><summary>회의 정보 <span>제목·일시·참석자 편집</span></summary><div class="meet-info">
+        <label>폴더 <select id="miFolder"></select></label>
+        <label>회의명 <input id="miTitle" autocomplete="off"></label>
+        <label>일시 <input id="miDate" autocomplete="off"></label>
+        <label>장소 <input id="miPlace" autocomplete="off"></label>
+        <label>참석 인원 <input id="miCount" autocomplete="off"></label>
+        <label class="wide">참석자 <input id="miAttendees" placeholder="쉼표로 구분 (모르면 비워 두세요)" autocomplete="off"></label>
+      </div></details>
+      <div class="spk-bar" data-scope="archive">
+        <span class="spk-label">화자 구분</span>
+        <button type="button" class="spk-toggle t-face" data-mode="face" aria-pressed="true" title="화면에 크게 잡힌 얼굴로 화자를 정합니다">얼굴</button>
+        <button type="button" class="spk-toggle t-voice" data-mode="voice" aria-pressed="true" title="등록된 성문과 목소리 묶음으로 화자를 정합니다">목소리</button>
+        <button type="button" class="spk-toggle t-context" data-mode="context" aria-pressed="true" title="자기소개(‘… 홍길동 의원입니다’)와 사회자의 지명(‘○○○ 위원님 질의해 주시기 바랍니다’)을 보고 화자를 정합니다. AI 키가 없어도 됩니다.">맥락</button>
+        <span class="spk-hint">끄고 켜면 녹취록에 바로 반영됩니다</span>
+      </div>
+      <div id="archivePlayerSlot"></div>
+      <div id="summaryStatus" class="hint pad"></div>
+      <div id="summaryBar" class="summary-bar hidden">
+        <b>AI 요약</b>
+        <button id="summaryFold" class="mini" aria-expanded="true" aria-controls="summaryBox">접기</button>
+        <button id="summaryBig" class="mini" aria-pressed="false">크게 보기</button>
+        <span class="spacer"></span>
+        <button class="mini" data-aexport="summary_md">요약 MD 받기</button>
+        <button class="mini" data-aexport="summary_docx">요약 DOCX 받기</button>
+      </div>
+      <div id="summaryBox" class="summary hidden"></div>
+      <div id="archTranscript" class="transcript" aria-label="저장된 녹취록" tabindex="0"></div>
+    </section>
+  </div>
+</main>
+
+<!-- ───────────────────────── 설정 ───────────────────────── -->
+<main id="tab-settings" class="tabpane">
+  <div class="page">
+    <div class="page-head">
+      <h2>나에게 맞는 작업 환경.</h2>
+      <p><span id="saveMsg" role="status">변경한 설정은 자동으로 저장됩니다.</span></p>
+    </div>
+    <nav class="settings-tabs" aria-label="설정 분류"><button class="active" data-setting="ai" aria-pressed="true">AI 연결</button><button data-setting="recognition" aria-pressed="false">음성인식</button><button data-setting="speakers" aria-pressed="false">화자·교정</button><button data-setting="people" aria-pressed="false">등록된 사람</button></nav>
+    <div class="page-grid">
+      <section class="card span-2 setting-panel" data-setting-panel="ai">
+        <div class="card-head"><b>AI 연결</b><span class="count">요약·메모 반영</span></div>
+        <div class="hint">요약할 때, 그리고 맥락 화자 구분에서 규칙으로 못 알아본 지명 문장이 있을 때만 그 문장이 외부로 전송됩니다. 받아쓰기·얼굴·목소리·자기소개 구분은 이 PC에서 처리합니다.</div>
+        <div class="form">
+          <label>제공자<select id="setProvider">
+            <option value="claude_cli">Claude Code 로그인 (기본)</option>
+            <option value="codex_cli">Codex 로그인</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="openai">OpenAI</option>
+            <option value="clova">네이버 Clova Studio (공공)</option>
+          </select></label>
+          <label id="setKeyRow">API 키<input id="setKey" type="password" placeholder="Gemini API 키"></label>
+          <label>모델(비우면 기본값)<input id="setSumModel" list="sumModels" placeholder="gemini-3.1-flash-lite"></label>
+          <datalist id="sumModels"></datalist>
+        </div>
+        <div class="row">
+          <span id="keyState" class="hint"></span>
+          <span class="spacer"></span>
+          <button id="openKeyGuide" class="mini">API 키 연결 안내 ↗</button>
+        </div>
+      </section>
+
+      <section class="card span-2 setting-panel hidden" data-setting-panel="recognition">
+        <div class="card-head"><b>음성인식 세부</b></div>
+        <div class="hint">
+          평소 쓰는 Whisper 모델 폴더를 지정할 수 있습니다. 열 수 없으면 이 프로그램의 기본 모델을 사용합니다.
+          스레드를 12개로 늘려도 6개 대비 12%밖에 빨라지지 않으므로 기본값(물리 코어 − 2)을 권합니다.
+        </div>
+        <div class="form">
+          <label>Whisper 모델 폴더 (비우면 기본 모델)<input id="setWhisperModel" type="text" placeholder="CTranslate2 모델 폴더 경로"></label>
+          <label>CPU 스레드 (0=자동)<input id="setThreads" type="number" min="0" max="32"></label>
+          <label>장치<select id="setDeviceType">
+            <option value="auto">자동</option><option value="cpu">CPU</option><option value="cuda">CUDA(NVIDIA)</option>
+          </select></label>
+          <label>연산 정밀도<select id="setCompute">
+            <option value="auto">자동</option><option value="int8">int8 (빠름)</option>
+            <option value="int8_float16">int8_float16</option><option value="float16">float16</option><option value="float32">float32</option>
+          </select></label>
+          <label>언어<input id="setLang" value="ko"></label>
+          <label>무음 판정(초)<input id="setSilence" type="number" step="0.1" min="0.2"></label>
+          <label>빔 크기<input id="setBeam" type="number" min="1" max="5"></label>
+          <label class="check"><input type="checkbox" id="setLowPrio"> 다른 프로그램에 CPU 양보</label>
+        </div>
+      </section>
+
+      <section class="card setting-panel hidden" data-setting-panel="speakers">
+        <div class="card-head"><b>화자 구분</b></div>
+        <div class="form">
+          <label class="check"><input type="checkbox" id="setFace"> 얼굴로 화자 구분</label>
+          <label>얼굴 임계값<input id="setFaceTh" type="number" step="0.01" min="0.1" max="0.9"></label>
+          <label class="check"><input type="checkbox" id="setVoice"> 목소리로 화자 구분</label>
+          <label>목소리 임계값<input id="setVoiceTh" type="number" step="0.01" min="0.1" max="0.95"></label>
+          <label class="check"><input type="checkbox" id="setAutoEnroll"> 얼굴로 확인된 목소리 자동 학습</label>
+          <label class="check"><input type="checkbox" id="setContext"> 맥락으로 화자 지정 (자기소개·사회자 지명)</label>
+        </div>
+        <div class="hint">여기 세 항목(얼굴·목소리·사회자 지명)은 새 회의의 기본값입니다. 회의 중이나 끝난 뒤에는 녹취록 위의 ‘화자 구분’ 스위치로 바로 바꿀 수 있습니다.</div>
+        <div class="hint">“○○○ 의원님 나오셔서 … 바랍니다”처럼 발언권을 넘기는 말을 AI가 읽고 다음 목소리에 그 이름을 붙입니다.
+          Codex 로그인(없으면 Claude Code 로그인)을 쓰며, 지명하는 말투가 보이는 문장과 직전 몇 문장만 외부로 전송됩니다.</div>
+      </section>
+
+      <section class="card setting-panel hidden" data-setting-panel="speakers">
+        <div class="card-head"><b>용어집 적용</b></div>
+        <div class="form">
+          <label class="check"><input type="checkbox" id="setCorrect"> 비슷한 말 자동 교정</label>
+          <label>교정 민감도<input id="setCorrectTh" type="number" step="0.01" min="0.5" max="0.95"></label>
+        </div>
+      </section>
+
+
+
+      <section class="card span-2 setting-panel hidden" data-setting-panel="people">
+        <div class="card-head">
+          <b>등록된 사람 <span id="memberCount" class="count"></span></b>
+          <span class="spacer"></span>
+          <button id="clearAllVoices" class="mini danger-ghost">학습된 목소리 전체 초기화</button>
+        </div>
+        <div class="hint">
+          받아쓰기 탭에서 얼굴을 캡처하거나, 화자를 직접 지정하면 여기에 쌓입니다.
+          화자 이름이 엉뚱하게 붙기 시작하면 목소리를 초기화하세요 (얼굴로 다시 배웁니다).
+        </div>
+        <div class="row">
+          <input id="memberName" placeholder="이름" aria-label="등록할 사람 이름">
+          <input id="memberTitle" placeholder="직함 (예: 의원, 의장, 국장)" aria-label="등록할 사람 직함">
+          <button id="addMember" class="primary">직접 추가</button>
+        </div>
+        <div id="memberList" class="members"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<div id="player" class="player hidden">
+  <button id="plPlay" class="play-btn" title="재생/멈춤 (스페이스바)">▶</button>
+  <span id="plTime" class="tnum">0:00 / 0:00</span>
+  <input type="range" id="plSeek" min="0" max="1000" value="0" step="1" aria-label="녹음 재생 위치">
+  <select id="plSpeed" title="재생 속도">
+    <option value="0.5">0.5배</option>
+    <option value="0.75">0.75배</option>
+    <option value="1">1배</option>
+    <option value="1.25">1.25배</option>
+    <option value="1.5" selected>1.5배</option>
+    <option value="2">2배</option>
+  </select>
+  <label class="check" title="재생 위치를 따라 문장이 자동으로 표시됩니다">
+    <input type="checkbox" id="plFollow" checked> 따라가기
+  </label>
+  <label class="check" title="지금 문장만 반복해서 듣습니다">
+    <input type="checkbox" id="plLoop"> 한 문장 반복
+  </label>
+  <a id="plDownload" class="btn-link" download>음성 파일</a>
+</div>
+<div id="playerHint" class="hint player-hint hidden">
+  문장을 클릭하면 그 대목부터 들립니다.
+  <kbd>Space</kbd> 재생/멈춤 · <kbd>←</kbd><kbd>→</kbd> 3초 이동 · <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 문장 이동
+</div>
+
+<div id="speakerModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="발언자 지정">
+  <div class="modal-box">
+    <b class="modal-title">이 발언의 화자</b>
+    <div class="hint">이름을 정하면 이후 같은 목소리는 자동으로 이 이름이 붙습니다.</div>
+    <input id="speakerName" placeholder="이름 (예: 김철수 의원)" autocomplete="off">
+    <div id="speakerList" class="speaker-list"></div>
+    <div id="speakerClearRow" class="row clear-row hidden">
+      <span class="hint">이름이 잘못 붙었나요? 지우면 '화자 1, 화자 2…'처럼 번호로 보입니다.</span>
+      <button id="speakerClearOne" class="danger-ghost">이 문장 이름 지우기</button>
+      <button id="speakerClearAll" class="danger-ghost"></button>
+    </div>
+    <div class="row end">
+      <button id="speakerUnset" class="danger-ghost hidden" title="직접 지정을 취소하고 얼굴·목소리·맥락으로 알아본 화자로 되돌립니다">지정 취소</button>
+      <span class="spacer"></span>
+      <button id="speakerCancel">취소</button>
+      <button id="speakerOk" class="primary">적용</button>
+    </div>
+  </div>
+</div>
+
+<div id="regionModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="화면 감시 영역 선택">
+  <div class="modal-box region-box">
+    <div class="row">
+      <b class="modal-title">감시할 화면 영역</b>
+      <span class="spacer"></span>
+      <span id="regionSize" class="count"></span>
+    </div>
+    <div class="hint">중계 화면이 있는 부분을 마우스로 끌어서 네모를 그리세요. 지금 이 순간의 화면입니다.</div>
+    <div id="regionStage" class="region-stage">
+      <img id="regionShot" alt="현재 화면" draggable="false">
+      <div id="regionRect" class="region-rect hidden"></div>
+    </div>
+    <div class="row end">
+      <button id="regionRetake">다시 찍기</button>
+      <span class="spacer"></span>
+      <button id="regionCancel">취소</button>
+      <button id="regionApply" class="primary" disabled>이 영역만 감시</button>
+    </div>
+  </div>
+</div>
+
+<div id="keyModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="AI 연결 안내">
+  <div class="modal-box">
+    <b class="modal-title">AI 연결을 확인해 주세요</b>
+    <div id="keyReason" class="hint"></div>
+    <div class="hint"><b>설정 → AI 연결</b>에서 로그인 도구 또는 API 제공자를 선택하세요. API 방식을 선택했다면 해당 제공자의 키가 필요합니다.</div>
+    <div class="row end">
+      <button id="keyClose">닫기</button>
+      <span class="spacer"></span>
+      <button id="keyGuide">API 키 연결 안내</button>
+      <button id="keyGoSettings" class="primary">연결 설정 열기</button>
+    </div>
+  </div>
+</div>
+
+<div id="helpModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="사용 안내">
+  <div class="modal-box help-box"><b class="modal-title">회의 한 편, 세 단계면 됩니다.</b><ol class="help-steps"><li><b>회의 준비</b><p>제목과 소리를 고르세요. 자료·용어 등록은 선택입니다.</p></li><li><b>받아쓰기 시작</b><p>확정된 문장은 녹취록에, 인식 중인 말은 아래에 표시됩니다.</p></li><li><b>마치고 검수</b><p>기록·요약에서 문장을 눌러 듣고, 수정한 뒤 내보내세요. AI 요약은 연결 설정 후 사용할 수 있습니다.</p></li></ol><div class="shortcut-list"><span><kbd>Ctrl</kbd> + <kbd>F</kbd> 녹취록 검색</span><span><kbd>Space</kbd> 재생·멈춤</span><span><kbd>←</kbd> <kbd>→</kbd> 3초 이동</span><span><kbd>Esc</kbd> 창 닫기</span></div><button id="helpClose" class="primary">확인했습니다</button></div>
+</div>
+<dialog id="actionDialog" aria-labelledby="actionTitle" aria-describedby="actionMessage"><form method="dialog" class="modal-box"><b id="actionTitle" class="modal-title"></b><p id="actionMessage" class="hint"></p><label id="actionField" class="field hidden"><span id="actionLabel">내용</span><input id="actionInput" autocomplete="off"><textarea id="actionText" class="hidden" rows="6"></textarea></label><div class="row end"><button value="cancel" formnovalidate>취소</button><button id="actionOk" value="ok" class="primary">저장</button></div></form></dialog>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<script src="/static/workspace.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+[
+  {
+    "name": "annotated-doc",
+    "version": "0.0.5"
+  },
+  {
+    "name": "annotated-types",
+    "version": "0.8.0"
+  },
+  {
+    "name": "anthropic",
+    "version": "2.3.0"
+  },
+  {
+    "name": "anyio",
+    "version": "4.15.1"
+  },
+  {
+    "name": "av",
+    "version": "19.0.2"
+  },
+  {
+    "name": "bottle",
+    "version": "0.13.4"
+  },
+  {
+    "name": "certifi",
+    "version": "2026.10.23"
+  },
+  {
+    "name": "cffi",
+    "version": "2.1.1"
+  },
+  {
+    "name": "click",
+    "version": "8.5.0"
+  },
+  {
+    "name": "clr_loader",
+    "version": "0.3.1"
+  },
+  {
+    "name": "colorama",
+    "version": "0.4.6"
+  },
+  {
+    "name": "ctranslate2",
+    "version": "4.8.4"
+  },
+  {
+    "name": "docstring_parser",
+    "version": "0.18.0"
+  },
+  {
+    "name": "fastapi",
+    "version": "0.162.0"
+  },
+  {
+    "name": "faster-whisper",
+    "version": "1.2.1"
+  },
+  {
+    "name": "filelock",
+    "version": "4.2.4"
+  },
+  {
+    "name": "flatbuffers",
+    "version": "25.12.19"
+  },
+  {
+    "name": "fsspec",
+    "version": "2026.9.0"
+  },
+  {
+    "name": "h11",
+    "version": "0.16.0"
+  },
+  {
+    "name": "hf-xet",
+    "version": "1.7.0"
+  },
+  {
+    "name": "httpcore",
+    "version": "1.0.9"
+  },
+  {
+    "name": "httpcore2",
+    "version": "2.16.0"
+  },
+  {
+    "name": "httptools",
+    "version": "0.9.0"
+  },
+  {
+    "name": "httpx",
+    "version": "0.28.1"
+  },
+  {
+    "name": "httpx2",
+    "version": "2.16.0"
+  },
+  {
+    "name": "huggingface_hub",
+    "version": "2.3.0"
+  },
+  {
+    "name": "idna",
+    "version": "3.20"
+  },
+  {
+    "name": "Jinja2",
+    "version": "3.1.6"
+  },
+  {
+    "name": "jiter",
+    "version": "0.18.0"
+  },
+  {
+    "name": "lxml",
+    "version": "6.1.3"
+  },
+  {
+    "name": "MarkupSafe",
+    "version": "3.0.4"
+  },
+  {
+    "name": "mss",
+    "version": "10.2.0"
+  },
+  {
+    "name": "numpy",
+    "version": "2.5.4"
+  },
+  {
+    "name": "nvidia-cublas-cu12",
+    "version": "12.9.2.10"
+  },
+  {
+    "name": "nvidia-cuda-nvrtc-cu12",
+    "version": "12.9.86"
+  },
+  {
+    "name": "nvidia-cudnn-cu12",
+    "version": "9.27.0.42"
+  },
+  {
+    "name": "onnxruntime",
+    "version": "1.31.1"
+  },
+  {
+    "name": "opencv-python",
+    "version": "4.14.0.94"
+  },
+  {
+    "name": "opentelemetry-api",
+    "version": "1.45.1"
+  },
+  {
+    "name": "packaging",
+    "version": "26.3"
+  },
+  {
+    "name": "pip",
+    "version": "26.2.2"
+  },
+  {
+    "name": "protobuf",
+    "version": "7.36.2"
+  },
+  {
+    "name": "proxy_tools",
+    "version": "0.1.0"
+  },
+  {
+    "name": "PyAudioWPatch",
+    "version": "0.2.12.9"
+  },
+  {
+    "name": "pycparser",
+    "version": "3.12"
+  },
+  {
+    "name": "pydantic",
+    "version": "2.14.1"
+  },
+  {
+    "name": "pydantic_core",
+    "version": "2.50.1"
+  },
+  {
+    "name": "pypdf",
+    "version": "6.21.2"
+  },
+  {
+    "name": "python-docx",
+    "version": "1.2.0"
+  },
+  {
+    "name": "python-dotenv",
+    "version": "1.2.4"
+  },
+  {
+    "name": "python-multipart",
+    "version": "0.0.32"
+  },
+  {
+    "name": "pythonnet",
+    "version": "3.2.1"
+  },
+  {
+    "name": "pywebview",
+    "version": "6.2.1"
+  },
+  {
+    "name": "PyYAML",
+    "version": "6.0.3"
+  },
+  {
+    "name": "setuptools",
+    "version": "84.2.1"
+  },
+  {
+    "name": "sherpa-onnx-core",
+    "version": "2.0.1"
+  },
+  {
+    "name": "sherpa_onnx",
+    "version": "2.0.1"
+  },
+  {
+    "name": "sniffio",
+    "version": "1.3.1"
+  },
+  {
+    "name": "soxr",
+    "version": "1.1.0"
+  },
+  {
+    "name": "starlette",
+    "version": "1.10.0"
+  },
+  {
+    "name": "tokenizers",
+    "version": "0.23.3"
+  },
+  {
+    "name": "tqdm",
+    "version": "4.70.1"
+  },
+  {
+    "name": "truststore",
+    "version": "0.10.5"
+  },
+  {
+    "name": "typing-inspection",
+    "version": "0.4.4"
+  },
+  {
+    "name": "typing_extensions",
+    "version": "4.16.0"
+  },
+  {
+    "name": "uvicorn",
+    "version": "0.54.0"
+  },
+  {
+    "name": "watchfiles",
+    "version": "1.3.0"
+  },
+  {
+    "name": "websockets",
+    "version": "17.3"
+  },
+  {
+    "name": "wheel",
+    "version": "0.48.0"
+  }
+]

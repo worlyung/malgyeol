@@ -1,0 +1,42 @@
+# 회의 받아쓰기 - 의존성
+# 모두 로컬에서 동작하는 패키지입니다. (요약 기능만 사용자가 직접 넣은 API 키를 사용)
+
+# --- 프로그램 창 (WebView2) ---
+pywebview>=6.2.1 ; sys_platform == "win32"
+
+# --- 웹 서버 / UI ---
+fastapi>=0.141.1
+uvicorn[standard]>=0.53.0
+jinja2>=3.1.6
+python-multipart>=0.0.32
+
+# --- 음성인식 (로컬) ---
+faster-whisper>=1.2.1
+ctranslate2>=4.8.2
+onnxruntime>=1.30.0            # Silero VAD, 화자 임베딩
+huggingface-hub>=1.32.0        # 모델 다운로드
+
+# --- 오디오 입출력 ---
+numpy>=2.5.3,<3
+soxr>=1.1.0                    # 리샘플링 (48k -> 16k)
+PyAudioWPatch>=0.2.12.8 ; sys_platform == "win32"   # WASAPI 루프백(PC 소리 캡처)
+sounddevice>=0.4.7 ; sys_platform != "win32"
+av>=18.1.0                     # 저장된 영상/음성 파일 디코딩 (ffmpeg 내장)
+
+# --- 화면 속 발언자 얼굴 인식 ---
+opencv-python>=4.14.0.94,<5          # YuNet 얼굴검출 + SFace 얼굴인식 (5.x는 YuNet ONNX 미지원)
+mss>=10.2.0                     # 화면 캡처
+
+# --- 음성 기반 화자 구분 ---
+sherpa-onnx>=1.13.8
+
+# --- 요약 (선택, 사용자 API 키를 넣었을 때만 사용) ---
+anthropic>=1.7               # Claude
+httpx2>=2.13.0               # anthropic 이 쓰는 HTTP 라이브러리 (보안 패치 버전 이상)
+httpcore2>=2.13.0
+httpx>=0.28.1                  # OpenAI / Gemini / Clova
+certifi>=2026.10.19            # httpx 가 쓰는 인증서 묶음 (PYSEC-2026-4320 수정판 이상)
+truststore>=0.10.4 ; sys_platform == "win32"   # 기관 보안 장비 인증서(Windows 인증서 저장소)를 믿도록
+
+# --- 내보내기 ---
+python-docx>=1.2.0

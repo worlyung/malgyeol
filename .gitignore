@@ -1,0 +1,43 @@
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+.env
+**/.env
+credentials.json
+token.json
+
+# 만들어지는 것 (용량이 크거나 PC마다 다릅니다)
+배포/
+data/**/models/
+data/**/sessions/
+data/**/uploads/
+data/**/webview/
+data/**/bin/
+*.log
+
+# 개인정보 — 절대 올리지 마세요
+# 얼굴 특징(face.npy)·성문(voice.npy)·사진은 data/faces/<인물ID>/ 에 저장됩니다.
+# data 아래 백업·복사 폴더에 있는 것도 막도록 **/ 를 붙입니다.
+data/**/faces/
+# 명부(data/members.json)는 공개판에서 비어 있습니다. 기관 명부를 채운 뒤에는 공개 저장소에 올리지 마세요.
+# 수작업 정리 때 만든 백업 폴더는 올리지 않습니다.
+data/백업_*/
+# 개인 설정은 배포하지 않습니다 (API 키는 data/.env 에만 저장)
+data/**/settings.json
+*.npy
+
+# 공개판 용어사전은 일반 의회 용어만 담았습니다. 기관 이름·인명을 더한 뒤에는 공개 저장소에 올리지 마세요.
+
+# 원본 이미지
+assets/*.psd
+
+# 시작 파일이 처음 실행 때 폴더 안에 풀어 두는 파이썬과 설치 기록
+python/
+.playwright-mcp/
+docs/ui-backup/
+docs/brand-backup/
+data/members.json
+data/glossary.json
+docs/release-private/
+data/설치기록.txt

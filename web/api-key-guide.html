@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>말결 · AI 연결 안내</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<style>
+  @font-face {
+    font-family: "Pretendard";
+    src: url("/static/fonts/PretendardVariable.woff2") format("woff2-variations"),
+         url("/static/fonts/PretendardVariable.woff2") format("woff2");
+    font-weight: 45 920; font-display: swap;
+  }
+  :root {
+    --bg: #f5f6f3; --surface: #fff; --line: #dfe6df;
+    --text: #202d27; --text-2: #45564c; --dim: #627168; --primary: #24664b; --primary-soft: #e7f1eb;
+    --warn: #7a4c00; --warn-soft: #fff1d6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif; font-size: 15px; line-height: 1.7; letter-spacing: -0.01em;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 24px 64px; }
+  h1 { font-size: 26px; line-height: 1.3; letter-spacing: -0.03em; margin: 0 0 8px; }
+  .lead { color: var(--dim); margin: 0 0 32px; }
+  h2 { font-size: 18px; letter-spacing: -0.02em; margin: 40px 0 12px; }
+  ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: step; display: flex; flex-direction: column; gap: 12px; }
+  ol.steps > li {
+    counter-increment: step; position: relative; padding: 16px 20px 16px 64px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: none;
+  }
+  ol.steps > li::before {
+    content: counter(step); position: absolute; left: 20px; top: 16px;
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--primary-soft); color: var(--primary); font-weight: 800; font-size: 14px;
+  }
+  ol.steps b { color: var(--text); }
+  .step-sub { color: var(--dim); font-size: 14px; margin-top: 2px; }
+  a.btn {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+    background: var(--primary); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px;
+    padding: 9px 16px; border-radius: 8px;
+  }
+  a.btn:hover { background: #194e38; }
+  a.btn:focus-visible { outline: 3px solid rgba(58, 104, 240, .4); outline-offset: 2px; }
+  code {
+    font-family: "Cascadia Mono", Consolas, monospace; font-size: 13px;
+    background: #eef2fb; padding: 1px 6px; border-radius: 5px; color: var(--text-2);
+  }
+  .note {
+    margin-top: 32px; padding: 16px 20px; border-radius: 14px;
+    background: var(--warn-soft); color: var(--warn); border: 1px solid #f3d9a4; font-size: 14px;
+  }
+  .note b { color: #5c3900; }
+  .path { font-weight: 700; color: var(--text-2); }
+  ul.plain { margin: 8px 0 0; padding-left: 20px; color: var(--text-2); }
+  ul.plain li { margin: 4px 0; }
+  ::selection { background: rgba(111, 141, 255, .3); }
+</style>
+</head>
+<body>
+<main>
+  <p class="step-sub" style="margin-bottom:20px">말결 / 도움말</p>
+  <h1>AI API 키 연결 안내</h1>
+  <p class="lead">
+    <b>설정 → AI 연결</b>에서 연결 방식을 선택하세요. Claude Code·Codex 로그인 방식은 별도의 API 키 없이 연결된 도구를 사용합니다.
+    API 제공자를 직접 선택한 경우에는 그 제공자의 키를 등록합니다. 받아쓰기·얼굴·목소리 구분은 이 PC에서 처리합니다.
+  </p>
+
+  <h2>Google Gemini API 키 연결 순서</h2>
+  <ol class="steps">
+    <li>
+      <b>Google AI Studio의 API 키 페이지를 엽니다.</b>
+      <div class="step-sub">아래 단추를 누르면 브라우저에서 열립니다. 구글 계정으로 로그인하세요.</div>
+      <a class="btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio 열기 ↗</a>
+    </li>
+    <li>
+      <b>처음이면 이용약관에 동의합니다.</b>
+      <div class="step-sub">처음 들어가면 약관 동의 창이 뜹니다. 내용을 확인하고 동의하세요.</div>
+    </li>
+    <li>
+      <b>'API 키 만들기(Create API key)'를 누릅니다.</b>
+      <div class="step-sub">프로젝트를 고르라고 하면 기본으로 나오는 것을 그대로 고르면 됩니다.</div>
+    </li>
+    <li>
+      <b>만들어진 키를 복사합니다.</b>
+      <div class="step-sub">영문·숫자가 섞인 긴 글자입니다. 나온 그대로 전부 복사하세요. 다른 사람에게 알려 주지 마세요.</div>
+    </li>
+    <li>
+      <b>이 프로그램에 붙여 넣습니다.</b>
+      <div class="step-sub">
+        <span class="path">설정 → AI 연결</span>에서 제공자를 <b>Google Gemini</b>로 고르고, <b>API 키</b> 칸에 붙여 넣으면
+        바로 저장됩니다. 모델 칸은 비워 두어도 됩니다.
+      </div>
+    </li>
+  </ol>
+
+  <div class="note">
+    <b>무료 키를 쓸 때 알아 둘 점</b>
+    <ul class="plain">
+      <li>무료로 쓰면 하루·분당 쓸 수 있는 양에 한도가 있습니다. 한도를 넘으면 잠시 뒤 다시 시도하세요.</li>
+      <li>구글 약관상 무료로 쓸 때는 보낸 내용이 구글 서비스 개선에 쓰일 수 있습니다.
+        공개되지 않은 회의나 개인정보가 담긴 녹취록이라면 기관에서 승인한 서비스(예: 네이버 Clova Studio 공공)를 쓰세요.</li>
+      <li>기관 보안 장비 때문에 연결이 막히면(인증서 오류) 정보화 담당자에게 문의하세요.</li>
+    </ul>
+  </div>
+
+  <h2>다른 AI를 쓰는 경우</h2>
+  <ul class="plain">
+    <li><b>네이버 Clova Studio (공공)</b> — 기관에서 받은 키를 넣고 제공자를 '네이버 Clova Studio (공공)'으로 고릅니다.</li>
+    <li><b>Anthropic (Claude) · OpenAI</b> — 각 회사 콘솔에서 받은 키를 넣고 해당 제공자를 고릅니다. (유료)</li>
+  </ul>
+</main>
+</body>
+</html>
