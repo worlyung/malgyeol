@@ -20,7 +20,10 @@
     "runtime_payload_matches_source": true,
     "payload_sensitive_data_scan_issues": 0,
     "unit_tests_passed": 14,
-    "github_asset_digest_matches_local": true
+    "github_asset_digest_matches_local": true,
+    "public_installer_download_http_200": true,
+    "public_update_feed_version_1_00": true,
+    "desktop_shortcut_recreated_in_host_environment": true
   },
   "screenshot": "installed-malgyeol-1.00.png",
   "not_tested": ["실시간 음성 받아쓰기 품질", "외부 AI 실제 호출", "다른 PC 및 GPU에서 실행"]
