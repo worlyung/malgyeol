@@ -10,6 +10,7 @@ exe 뒤에 붙어 있는 압축 꾸러미를 풀어 설치합니다.
 from __future__ import annotations
 
 import json
+import base64
 import os
 import shutil
 import subprocess
@@ -48,6 +49,16 @@ FONT_FILE = "NotoSansKR-Installer.ttf"
 def default_target() -> Path:
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     return Path(base) / FOLDER_NAME
+
+
+def shell_folder(folder_id: int) -> Path:
+    """Windows가 지정한 바탕화면/시작 메뉴 위치를 사용합니다."""
+    import ctypes
+    buffer = ctypes.create_unicode_buffer(32768)
+    result = ctypes.windll.shell32.SHGetFolderPathW(None, folder_id, None, 0, buffer)
+    if result != 0:
+        raise OSError(f"Windows 바로가기 폴더를 찾지 못했습니다: {result}")
+    return Path(buffer.value).resolve()
 
 
 def long_path(path: Path) -> str:
@@ -646,6 +657,7 @@ class Installer(tk.Tk):
                 percent = done / total
                 self.after(0, lambda p=percent, d=done: self._progress(p, d, total))
             zf.close()
+            target = target.resolve(strict=True)
 
             (target / VERSION_FILE).write_text(
                 f"{APP_NAME} {self.release_version}\n설치 시각: {time.strftime('%Y-%m-%d %H:%M')}\n", encoding="utf-8")
@@ -796,9 +808,7 @@ class Installer(tk.Tk):
 
     def _make_shortcut(self, target: Path) -> None:
         """바탕화면과 시작 메뉴에 바로가기를 만듭니다."""
-        places = [Path(os.path.expanduser("~")) / "Desktop"]
-        if os.environ.get("APPDATA"):
-            places.append(Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs")
+        places = [shell_folder(0x10), shell_folder(0x02)]
         for place in places:
             if place.exists():
                 for old in OLD_NAMES:
@@ -847,24 +857,28 @@ class Installer(tk.Tk):
             pass
 
     def _make_link(self, target: Path, link: Path) -> None:
+        target = target.resolve(strict=True)
         command = app_command(target)
         if not command:
             return
-        icon = target / "assets" / "icon.ico"
+        icon = (target / "assets" / "malgyeol.ico").resolve(strict=True)
         launcher = command[0]
         arguments = subprocess.list2cmdline(command[1:])
         ps = (
+            "$ErrorActionPreference='Stop';"
             f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{ps_quote(link)}');"
             f"$s.TargetPath='{ps_quote(launcher)}';$s.Arguments='{ps_quote(arguments)}';"
             f"$s.WorkingDirectory='{ps_quote(target)}';"
-            f"$s.IconLocation='{ps_quote(icon if icon.exists() else launcher)}';$s.Save()"
+            f"$s.IconLocation='{ps_quote(icon)},0';$s.Save();"
+            f"if(-not(Test-Path -LiteralPath '{ps_quote(link)}')){{throw 'Shortcut was not created'}}"
         )
         try:
-            subprocess.run(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
-                           check=False, capture_output=True, timeout=30,
+            encoded = base64.b64encode(ps.encode('utf-16-le')).decode('ascii')
+            subprocess.run(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", encoded],
+                           check=True, capture_output=True, timeout=30,
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        except Exception:  # noqa: BLE001
-            pass
+        except (subprocess.SubprocessError, OSError) as exc:
+            raise OSError("바로가기를 만들지 못했습니다.") from exc
 
     def launch(self) -> None:
         target = self.installed_at

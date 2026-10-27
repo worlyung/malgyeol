@@ -3,8 +3,18 @@
   "product": "말결",
   "version": "1.00",
   "asset": "Malgyeol-1.00-Setup.exe",
-  "bytes": 1894839170,
-  "sha256": "e98f1237f9c497019c6cc216ecba1da707f2c11e32d2c298a98772aa91fc04db",
+  "bytes": 1894825681,
+  "sha256": "754fbf9b230b2de8d3c1d9eab59ae81684c304c32cbd8fb836a49b2b0a28cdb9",
+  "revision": "2026-10-27 icon path fix",
+  "icon_fix_checks": {
+    "fresh_install_in_path_with_spaces": true,
+    "desktop_and_start_menu_created_without_manual_repair": true,
+    "shortcut_target_and_icon_use_resolved_physical_path": true,
+    "logo_visually_verified_in_windows_explorer": true,
+    "app_launched_by_double_clicking_new_shortcut": true,
+    "regression_tests_passed": 17,
+    "existing_install_shortcuts_restored_after_test": true
+  },
   "checks": {
     "windows_installer_opened": true,
     "clean_install_completed": true,

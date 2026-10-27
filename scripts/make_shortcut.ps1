@@ -5,6 +5,14 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Py = Join-Path $Root 'python'
 $pyw = Join-Path $Py 'pythonw.exe'
 if (-not (Test-Path $pyw)) { $pyw = Join-Path $Root '.venv\Scripts\pythonw.exe' }
+$consolePython = Join-Path (Split-Path -Parent $pyw) 'python.exe'
+$resolved = & $consolePython -c 'import json,sys; from pathlib import Path; print(json.dumps(str(Path(sys.argv[1]).resolve(strict=True))))' $Root
+if ($LASTEXITCODE -ne 0) { throw '설치 위치를 확인하지 못했습니다.' }
+$Root = $resolved | ConvertFrom-Json
+$Py = Join-Path $Root 'python'
+$pyw = Join-Path $Py 'pythonw.exe'
+if (-not (Test-Path $pyw)) { $pyw = Join-Path $Root '.venv\Scripts\pythonw.exe' }
+if (-not (Test-Path (Join-Path $Root 'assets\malgyeol.ico'))) { throw '말결 아이콘 파일이 없습니다.' }
 
 $desk = if ($env:LT_SHORTCUT_DIR) { $env:LT_SHORTCUT_DIR } else { [Environment]::GetFolderPath('Desktop') }   # (시험용)
 $shell = New-Object -ComObject WScript.Shell
