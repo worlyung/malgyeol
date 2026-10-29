@@ -1362,6 +1362,21 @@ function paintFolders(sessions) {
       try { localStorage.setItem("lt_folder", name); } catch (e) { /* 저장 불가 */ }
       loadSessions().catch(e => toast(e.message,true));
     });
+    // 회의를 끌어다 놓으면 그 폴더로 옮깁니다. ('전체 회의'에 놓으면 폴더에서 뺍니다)
+    el.addEventListener("dragover", (ev) => {
+      if (!ev.dataTransfer.types.includes("text/x-malgyeol-session")) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+      el.classList.add("drop-over");
+    });
+    el.addEventListener("dragleave", () => el.classList.remove("drop-over"));
+    el.addEventListener("drop", (ev) => {
+      el.classList.remove("drop-over");
+      const id = ev.dataTransfer.getData("text/x-malgyeol-session");
+      if (!id) return;
+      ev.preventDefault();
+      moveToFolder(id, name);
+    });
     el.tabIndex = 0;
     el.setAttribute("aria-label",label);
     el.addEventListener("keydown",ev => { if (ev.target === el && ["Enter"," "].includes(ev.key)) { ev.preventDefault(); el.click(); } });
@@ -1434,6 +1449,7 @@ function paintSessions() {
     const date = new Date((s.created || 0) * 1000);
     el.innerHTML = `<div class="sess-top"><div class="sess-name"></div>
         <div class="sess-tools">
+          <button class="mini" data-act="move" title="폴더로 옮기기" aria-haspopup="menu">폴더</button>
           <button class="mini" data-act="rename" title="이름 바꾸기">이름</button>
           <button class="mini danger-ghost" data-act="delete" title="지우기">삭제</button>
         </div></div>
@@ -1443,8 +1459,16 @@ function paintSessions() {
       if (ev.target.closest(".sess-tools")) return;
       openSession(s.id).catch(e => toast("회의를 열지 못했습니다: " + e.message, true));
     });
+    el.querySelector('[data-act="move"]').addEventListener("click", (ev) => openFolderMenu(ev.currentTarget, s));
     el.querySelector('[data-act="rename"]').addEventListener("click", () => renameSession(s));
     el.querySelector('[data-act="delete"]').addEventListener("click", () => deleteSession(s));
+    el.draggable = true;
+    el.addEventListener("dragstart", (ev) => {
+      ev.dataTransfer.setData("text/x-malgyeol-session", s.id);
+      ev.dataTransfer.effectAllowed = "move";
+      el.classList.add("dragging");
+    });
+    el.addEventListener("dragend", () => el.classList.remove("dragging"));
     el.tabIndex = 0;
     el.setAttribute("aria-label",s.title || s.id);
     el.setAttribute("aria-current",String(s.id === S.archive.id));
@@ -1452,6 +1476,60 @@ function paintSessions() {
     box.appendChild(el);
   });
 }
+
+/* 회의를 폴더로 옮깁니다. folder 가 비면 폴더에서 뺍니다. (목록의 '폴더' 버튼·끌어다 놓기·회의 정보가 함께 씁니다) */
+async function moveToFolder(id, folder) {
+  const s = (S.sessions || []).find((x) => x.id === id);
+  if (s && (s.folder || "") === folder) return;
+  try {
+    await api(`/api/sessions/${id}`, { method: "PATCH", body: { folder } });
+    if (S.archive.id === id && S.archive.meta) S.archive.meta.folder = folder;
+    await loadSessions();
+    toast(folder ? `'${folder}' 폴더로 옮겼습니다` : "폴더에서 뺐습니다");
+  } catch (e) { toast(e.message, true); }
+}
+
+function closeFolderMenu() {
+  document.querySelector(".folder-menu")?.remove();
+}
+
+function openFolderMenu(anchor, s) {
+  const reopen = document.querySelector(".folder-menu")?.dataset.id === s.id;
+  closeFolderMenu();
+  if (reopen) return;                       // 같은 버튼을 다시 누르면 닫기만 합니다
+  const cur = s.folder || "";
+  const menu = document.createElement("div");
+  menu.className = "folder-menu";
+  menu.dataset.id = s.id;
+  menu.setAttribute("role", "menu");
+  const item = (label, onPick, current = false) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role", "menuitem");
+    b.className = current ? "cur" : "";
+    b.textContent = (current ? "✓ " : "") + label;
+    b.disabled = current;
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); closeFolderMenu(); onPick(); });
+    menu.appendChild(b);
+  };
+  S.folders.forEach((f) => item(f, () => moveToFolder(s.id, f), f === cur));
+  if (cur) item("폴더에서 빼기", () => moveToFolder(s.id, ""));
+  item("+ 새 폴더", async () => {
+    const name = (await uiPrompt("새 폴더 이름") || "").trim();
+    if (name) moveToFolder(s.id, name);
+  });
+  document.body.appendChild(menu);
+  const r = anchor.getBoundingClientRect();
+  menu.style.top = `${Math.min(r.bottom + 4, window.innerHeight - menu.offsetHeight - 8)}px`;
+  menu.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  menu.querySelector("button:not(:disabled)")?.focus();
+}
+
+document.addEventListener("click", (ev) => {
+  if (!ev.target.closest(".folder-menu, [data-act='move']")) closeFolderMenu();
+});
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeFolderMenu(); });
+$("#sessionList").addEventListener("scroll", closeFolderMenu);
 
 async function renameSession(s) {
   const title = await uiPrompt("회의 이름", s.title || "");
@@ -1558,6 +1636,22 @@ $("#miTitle").addEventListener("change", async () => {
   } catch (e) { toast(e.message, true); }
 });
 
+$("#elevenBtn").addEventListener("click", async () => {
+  const id = S.archive.id;
+  if (!id) return toast("먼저 회의를 고르세요", true);
+  if (!S.settings?.speaker?.elevenlabs_key) return toast("설정 → 화자 구분에서 일레븐랩스 API 키를 먼저 넣어 주세요.", true);
+  if (!await uiConfirm("이 회의의 녹음 전체를 일레븐랩스로 보내 사람별로 다시 나눕니다.\n글자는 그대로 두고 화자만 바꿉니다. 이용 요금은 일레븐랩스 계정에 청구됩니다.", "화자 다시 나누기")) return;
+  const btn = $("#elevenBtn");
+  btn.disabled = true;
+  btn.textContent = "나누는 중…";
+  try {
+    const r = await api(`/api/sessions/${id}/elevenlabs`, { method: "POST" });
+    toast(`${r.speakers.length}명으로 다시 나눴습니다 (${r.segments}문장)`);
+    if (S.archive.id === id) await openSession(id);
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = "화자 다시 나누기"; }
+});
+
 $("#miFolder").addEventListener("change", async () => {
   const sel = $("#miFolder");
   let folder = sel.value;
@@ -1565,12 +1659,7 @@ $("#miFolder").addEventListener("change", async () => {
     folder = (await uiPrompt("새 폴더 이름") || "").trim();
     if (!folder) { sel.value = S.archive.meta.folder || ""; return; }
   }
-  try {
-    await api(`/api/sessions/${S.archive.id}`, { method: "PATCH", body: { folder } });
-    S.archive.meta.folder = folder;
-    await loadSessions();
-    toast(folder ? `'${folder}' 폴더로 옮겼습니다` : "폴더에서 뺐습니다");
-  } catch (e) { toast(e.message, true); }
+  await moveToFolder(S.archive.id, folder);
 });
 
 // AI 요약은 마크다운으로 옵니다. **굵게**, 제목, 목록이 그대로 보이도록 바꿔 줍니다.
@@ -1773,6 +1862,7 @@ function fillSettings(cfg) {
   $("#setVoice").checked = sp.voice_enabled; $("#setVoiceTh").value = sp.voice_threshold;
   $("#setAutoEnroll").checked = sp.voice_autoenroll;
   $("#setContext").checked = sp.context_enabled !== false;
+  $("#setElevenKey").value = sp.elevenlabs_key || "";
   const r = sp.face_region || [];
   $("#setCorrect").checked = g.correction_enabled; $("#setCorrectTh").value = g.correction_threshold;
   $("#setProvider").value = su.provider; $("#setSumModel").value = su.model || "";
@@ -1796,7 +1886,7 @@ async function loadMonitors(sel) {
 const SETTING_IDS = ["setPerf", "setWhisperModel", "setDeviceType", "setCompute", "setLang",
                      "setSilence", "setBeam", "setThreads", "setLowPrio", "setFace", "setMonitor",
                      "setFaceTh", "setVoice", "setVoiceTh", "setAutoEnroll", "setContext", "setCorrect", "setCorrectTh", "setProvider",
-                     "setKey", "setSumModel"];
+                     "setKey", "setSumModel", "setElevenKey"];
 
 function collectSettings() {
   const num = (id) => parseFloat($(id).value);
@@ -1817,6 +1907,7 @@ function collectSettings() {
       voice_enabled: $("#setVoice").checked, voice_threshold: num("#setVoiceTh"),
       voice_autoenroll: $("#setAutoEnroll").checked,
       context_enabled: $("#setContext").checked,
+      elevenlabs_key: $("#setElevenKey").value,
     },
     glossary: {
       correction_enabled: $("#setCorrect").checked, correction_threshold: num("#setCorrectTh"),

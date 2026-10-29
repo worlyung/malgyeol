@@ -292,6 +292,7 @@
         <button type="button" class="spk-toggle t-voice" data-mode="voice" aria-pressed="true" title="등록된 성문과 목소리 묶음으로 화자를 정합니다">목소리</button>
         <button type="button" class="spk-toggle t-context" data-mode="context" aria-pressed="true" title="자기소개(‘… 홍길동 의원입니다’)와 사회자의 지명(‘○○○ 위원님 질의해 주시기 바랍니다’)을 보고 화자를 정합니다. AI 키가 없어도 됩니다.">맥락</button>
         <span class="spk-hint">끄고 켜면 녹취록에 바로 반영됩니다</span>
+        <button type="button" id="elevenBtn" class="mini" title="녹음 전체를 일레븐랩스로 보내 사람별로 다시 나눕니다 (설정에서 키 필요)">화자 다시 나누기</button>
       </div>
       <div id="archivePlayerSlot"></div>
       <div id="summaryStatus" class="hint pad"></div>
@@ -373,7 +374,10 @@
           <label>목소리 임계값<input id="setVoiceTh" type="number" step="0.01" min="0.1" max="0.95"></label>
           <label class="check"><input type="checkbox" id="setAutoEnroll"> 얼굴로 확인된 목소리 자동 학습</label>
           <label class="check"><input type="checkbox" id="setContext"> 맥락으로 화자 지정 (자기소개·사회자 지명)</label>
+          <label>일레븐랩스 API 키<input id="setElevenKey" type="password" placeholder="sk_... (화자 다시 나누기용 · 선택)" autocomplete="off"></label>
         </div>
+        <div class="hint">일레븐랩스 키를 넣으면 기록·요약에서 <b>‘화자 다시 나누기’</b>를 쓸 수 있습니다. 여럿이 빠르게 주고받는 대화도 사람별로 나눠 줍니다.
+          누르는 회의의 녹음 파일이 일레븐랩스 서버로 전송되고, 이용 요금은 일레븐랩스 계정에 청구됩니다. 키는 이 PC의 data/.env 에만 저장됩니다.</div>
         <div class="hint">여기 세 항목(얼굴·목소리·사회자 지명)은 새 회의의 기본값입니다. 회의 중이나 끝난 뒤에는 녹취록 위의 ‘화자 구분’ 스위치로 바로 바꿀 수 있습니다.</div>
         <div class="hint">“○○○ 의원님 나오셔서 … 바랍니다”처럼 발언권을 넘기는 말을 AI가 읽고 다음 목소리에 그 이름을 붙입니다.
           Codex 로그인(없으면 Claude Code 로그인)을 쓰며, 지명하는 말투가 보이는 문장과 직전 몇 문장만 외부로 전송됩니다.</div>
