@@ -45,7 +45,7 @@ def audit(source_only=False):
                 data = archive.read(name)
                 if pattern.search(data) or any(secret in data for secret in secrets):
                     issues.append(name + ': possible credential in payload')
-        assert b'VERSION = "1.00"' in archive.read('app/version.py')
+        assert b'VERSION = "1.01"' in archive.read('app/version.py')
         assert 'LICENSE' in names
     result = {'tracked_files': len(list(filter(None, tracked))), 'payload_files': len(names), 'issues': issues}
     print(json.dumps(result, ensure_ascii=False, indent=2))
