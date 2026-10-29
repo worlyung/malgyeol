@@ -339,6 +339,9 @@ async def api_set_settings(patch: dict = Body(...)) -> dict:
     key = (patch.get("summary") or {}).get("api_key")
     if key and set(key[:-4]) == {"*"}:
         patch["summary"].pop("api_key")
+    el = (patch.get("speaker") or {}).get("elevenlabs_key")
+    if el and set(el[:-4]) == {"*"}:
+        patch["speaker"].pop("elevenlabs_key")
     before = config.load()
     config.save(patch)
     _apply_live_settings(before, config.load())
@@ -619,6 +622,54 @@ async def api_delete_session(session_id: str) -> dict:
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return {"ok": True}
+
+
+_eleven_lock = threading.Lock()
+
+
+@app.post("/api/sessions/{session_id}/elevenlabs")
+async def api_elevenlabs(session_id: str) -> dict:
+    """일레븐랩스로 화자 다시 나누기. 녹음 전체를 보내므로 끝난 회의에서만 합니다."""
+    return await asyncio.get_running_loop().run_in_executor(None, _elevenlabs, session_id)
+
+
+def _elevenlabs(session_id: str) -> dict:
+    from .speakers import elevenlabs
+
+    key = config.elevenlabs_key()
+    if not key:
+        raise HTTPException(400, "설정 → 화자 구분에서 일레븐랩스 API 키를 먼저 넣어 주세요.")
+    if state.session and state.session.id == session_id and state.session.state in {"running", "stopping"}:
+        raise HTTPException(400, "받아쓰는 중인 회의입니다. 끝난 뒤 다시 눌러 주세요.")
+    d = paths.SESSIONS_DIR / session_id
+    wav = d / "audio.wav"
+    if not wav.exists():
+        raise HTTPException(400, "이 회의에는 녹음이 없어 화자를 다시 나눌 수 없습니다.")
+    if not _eleven_lock.acquire(blocking=False):
+        raise HTTPException(400, "다른 회의의 화자를 나누는 중입니다. 끝난 뒤 다시 눌러 주세요.")
+    try:
+        state.publish({"type": "log", "message": "일레븐랩스로 녹음을 보내는 중입니다… (1시간 녹음 기준 1~3분)"})
+        try:
+            words = elevenlabs.fetch_words(wav, key, config.load()["asr"].get("language", "ko"))
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(502, str(exc)) from exc
+        store, _meta = _store_for(session_id)
+        with store._lock:
+            backup = d / "transcript.before-elevenlabs.json"
+            if not backup.exists():                # 처음 상태만 남겨 둡니다 (되돌릴 때 씀)
+                store.save(force=True)
+                backup.write_bytes((d / "transcript.json").read_bytes())
+            new = elevenlabs.resplit(store.segments, words, lambda **f: session_mod.Segment(
+                id=0, speaker_source="manual", **f))
+            for i, seg in enumerate(new, 1):
+                seg.id = i
+            store.segments = new
+            store.save(force=True)
+        session_mod.save_meta(session_id, {"segments": len(new)})
+        speakers = sorted({s.speaker for s in new}, key=lambda x: int(x.split()[-1]))
+        return {"ok": True, "segments": len(new), "speakers": speakers}
+    finally:
+        _eleven_lock.release()
 
 
 @app.post("/api/sessions/{session_id}/speaker-modes")

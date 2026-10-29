@@ -1,6 +1,6 @@
 """설정 파일 로드/저장.
 
-설정은 data/settings.json, 요약용 API 키는 data/.env 에 따로 저장됩니다.
+설정은 data/settings.json, 요약·일레븐랩스 API 키는 data/.env 에 따로 저장됩니다.
 """
 from __future__ import annotations
 
@@ -108,14 +108,21 @@ def _merge(base: dict, override: dict) -> dict:
     return out
 
 
-def _read_api_key() -> str | None:
-    """data/.env 의 요약 키를 읽습니다. 항목이 없으면 None을 돌려줍니다."""
+ELEVENLABS_KEY = "ELEVENLABS_API_KEY"     # 화자 다시 나누기(일레븐랩스)용. data/.env 에만 둡니다
+
+
+def elevenlabs_key() -> str:
+    return _read_api_key(ELEVENLABS_KEY) or ""
+
+
+def _read_api_key(name: str = "SUMMARY_API_KEY") -> str | None:
+    """data/.env 의 키를 읽습니다. 항목이 없으면 None을 돌려줍니다."""
     try:
         lines = paths.SECRETS_FILE.read_text("utf-8").splitlines()
     except FileNotFoundError:
         return None
     for line in lines:
-        if line.startswith("SUMMARY_API_KEY="):
+        if line.startswith(name + "="):
             raw = line.split("=", 1)[1]
             try:
                 return str(json.loads(raw))
@@ -124,14 +131,14 @@ def _read_api_key() -> str | None:
     return None
 
 
-def _write_api_key(key: str) -> None:
-    """다른 .env 항목을 보존하며 요약 키만 바꿉니다."""
+def _write_api_key(key: str, name: str = "SUMMARY_API_KEY") -> None:
+    """다른 .env 항목을 보존하며 그 키만 바꿉니다."""
     try:
         lines = paths.SECRETS_FILE.read_text("utf-8").splitlines()
     except FileNotFoundError:
         lines = []
-    lines = [line for line in lines if not line.startswith("SUMMARY_API_KEY=")]
-    lines.append("SUMMARY_API_KEY=" + json.dumps(key, ensure_ascii=False))
+    lines = [line for line in lines if not line.startswith(name + "=")]
+    lines.append(name + "=" + json.dumps(key, ensure_ascii=False))
     paths.DATA_DIR.mkdir(parents=True, exist_ok=True)
     paths.SECRETS_FILE.write_text("\n".join(lines) + "\n", "utf-8")
 
@@ -181,6 +188,9 @@ def save(patch: dict[str, Any]) -> dict[str, Any]:
         summary_patch = patch.get("summary")
         if isinstance(summary_patch, dict) and "api_key" in summary_patch:
             _write_api_key(str(summary_patch.pop("api_key")))
+        speaker_patch = patch.get("speaker")
+        if isinstance(speaker_patch, dict) and "elevenlabs_key" in speaker_patch:
+            _write_api_key(str(speaker_patch.pop("elevenlabs_key")).strip(), ELEVENLABS_KEY)
         merged = _merge(current, patch)
         merged["summary"]["api_key"] = _read_api_key() or ""
         paths.ensure_dirs()
@@ -200,6 +210,8 @@ def public() -> dict[str, Any]:
     key = cfg["summary"].get("api_key") or ""
     cfg["summary"]["api_key"] = ("*" * max(0, len(key) - 4) + key[-4:]) if key else ""
     cfg["summary"]["has_key"] = bool(key)
+    el = elevenlabs_key()
+    cfg["speaker"]["elevenlabs_key"] = ("*" * max(0, len(el) - 4) + el[-4:]) if el else ""
     from . import summarize
 
     cfg["summary"]["ai_ready"] = summarize.available(cfg["summary"])
