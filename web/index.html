@@ -277,6 +277,7 @@
         </div>
         <details class="export-menu"><summary>내보내기 <span>↓</span></summary><div class="export-options"><button data-aexport="docx">Word 문서 <small>DOCX</small></button><button data-aexport="txt">텍스트 <small>TXT</small></button><button data-aexport="srt">영상 자막 <small>SRT</small></button><button data-aexport="md">마크다운 <small>MD</small></button></div></details>
         <button id="summaryBtn" class="primary ai">AI 요약</button>
+        <button id="externalSummaryBtn" class="mini" title="회의 정보와 녹취록을 외부 AI용 요약 요청문으로 만듭니다">외부 AI용 프롬프트</button>
       </div>
       <details id="meetInfo" class="meeting-details hidden"><summary>회의 정보 <span>제목·일시·참석자 편집</span></summary><div class="meet-info">
         <label>폴더 <select id="miFolder"></select></label>
@@ -495,8 +496,17 @@
 </div>
 
 <div id="helpModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="사용 안내">
-  <div class="modal-box help-box"><b class="modal-title">회의 한 편, 세 단계면 됩니다.</b><ol class="help-steps"><li><b>회의 준비</b><p>제목과 소리를 고르세요. 자료·용어 등록은 선택입니다.</p></li><li><b>받아쓰기 시작</b><p>확정된 문장은 녹취록에, 인식 중인 말은 아래에 표시됩니다.</p></li><li><b>마치고 검수</b><p>기록·요약에서 문장을 눌러 듣고, 수정한 뒤 내보내세요. AI 요약은 연결 설정 후 사용할 수 있습니다.</p></li></ol><div class="shortcut-list"><span><kbd>Ctrl</kbd> + <kbd>F</kbd> 녹취록 검색</span><span><kbd>Space</kbd> 재생·멈춤</span><span><kbd>←</kbd> <kbd>→</kbd> 3초 이동</span><span><kbd>Esc</kbd> 창 닫기</span></div><button id="helpClose" class="primary">확인했습니다</button></div>
+  <div class="modal-box help-box"><b class="modal-title">회의 한 편, 세 단계면 됩니다.</b><ol class="help-steps"><li><b>회의 준비</b><p>제목과 소리를 고르세요. 자료·용어 등록은 선택입니다.</p></li><li><b>받아쓰기 시작</b><p>확정된 문장은 녹취록에, 인식 중인 말은 아래에 표시됩니다.</p></li><li><b>마치고 검수</b><p>기록·요약에서 문장을 눌러 듣고, 수정한 뒤 내보내세요. AI 요약은 연결 설정 후 사용할 수 있습니다. 연결이 없다면 외부 AI용 프롬프트를 복사해 원하는 AI 서비스에 붙여넣으세요.</p></li></ol><div class="shortcut-list"><span><kbd>Ctrl</kbd> + <kbd>F</kbd> 녹취록 검색</span><span><kbd>Space</kbd> 재생·멈춤</span><span><kbd>←</kbd> <kbd>→</kbd> 3초 이동</span><span><kbd>Esc</kbd> 창 닫기</span></div><button id="helpClose" class="primary">확인했습니다</button></div>
 </div>
+<dialog id="externalPromptDialog" aria-labelledby="externalPromptTitle">
+  <div class="modal-box external-prompt-box">
+    <b id="externalPromptTitle" class="modal-title">외부 AI용 요약 프롬프트</b>
+    <p class="hint">회의 정보와 녹취록 전문이 들어 있습니다. 내용을 확인한 뒤 ChatGPT·Claude·Gemini 등에 붙여넣으세요. 붙여넣으면 해당 서비스로 전송됩니다.</p>
+    <textarea id="externalPromptText" readonly spellcheck="false" aria-label="외부 AI에 붙여넣을 프롬프트"></textarea>
+    <p class="hint">붙여넣기가 안 되면 위에서 전체 내용을 선택해 Ctrl+C로 복사하거나 TXT 파일을 받으세요. 긴 녹취록은 AI 서비스의 입력 한도를 넘을 수 있습니다.</p>
+    <div class="row end"><button id="externalPromptClose">닫기</button><span class="spacer"></span><button id="externalPromptDownload">TXT 받기</button><button id="externalPromptCopy" class="primary">프롬프트 복사</button></div>
+  </div>
+</dialog>
 <dialog id="actionDialog" aria-labelledby="actionTitle" aria-describedby="actionMessage"><form method="dialog" class="modal-box"><b id="actionTitle" class="modal-title"></b><p id="actionMessage" class="hint"></p><label id="actionField" class="field hidden"><span id="actionLabel">내용</span><input id="actionInput" autocomplete="off"><textarea id="actionText" class="hidden" rows="6"></textarea></label><div class="row end"><button value="cancel" formnovalidate>취소</button><button id="actionOk" value="ok" class="primary">저장</button></div></form></dialog>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="/static/workspace.js"></script>

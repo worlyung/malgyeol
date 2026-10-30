@@ -1813,6 +1813,50 @@ $$("[data-aexport]").forEach((b) => b.addEventListener("click", () => {
 // 받아쓰는 중이거나 마지막 문장을 정리하는 중인 회의 (지우거나 요약하면 녹취가 빠지거나 파일이 깨질 수 있음)
 function stillWriting(id) { return S.running && !!id && id === S.sessionId; }
 
+$("#externalSummaryBtn").addEventListener("click", async () => {
+  const id = S.archive.id;
+  if (!id) return toast("회의를 고르세요", true);
+  if (stillWriting(id)) return toast("받아쓰기가 끝난 뒤에 프롬프트를 만들 수 있습니다.", true);
+  const button = $("#externalSummaryBtn");
+  button.disabled = true;
+  try {
+    const response = await api(`/api/sessions/${encodeURIComponent(id)}/summary-prompt`);
+    const prompt = await response.text();
+    if (S.archive.id !== id) return toast("회의가 바뀌었습니다. 다시 눌러 주세요.", true);
+    $("#externalPromptText").value = prompt;
+    $("#externalPromptDialog").showModal();
+    $("#externalPromptCopy").focus();
+    $("#externalPromptText").scrollTop = 0;
+  } catch (e) { toast("프롬프트를 만들지 못했습니다: " + e.message, true); }
+  finally { button.disabled = false; }
+});
+
+$("#externalPromptCopy").addEventListener("click", async () => {
+  const field = $("#externalPromptText");
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("클립보드를 사용할 수 없습니다.");
+    await navigator.clipboard.writeText(field.value);
+    toast("프롬프트를 복사했습니다. 붙여넣기 결과를 확인해 주세요.");
+  } catch (e) {
+    field.focus();
+    field.select();
+    toast("자동 복사가 안 됩니다. Ctrl+C로 복사하거나 TXT 파일을 받으세요.", true);
+  }
+});
+
+$("#externalPromptDownload").addEventListener("click", () => {
+  const url = URL.createObjectURL(new Blob([$("#externalPromptText").value], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "말결-외부-AI-요약-프롬프트.txt";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("프롬프트 TXT 파일을 받았습니다.");
+});
+
+$("#externalPromptClose").addEventListener("click", () => $("#externalPromptDialog").close());
+$("#externalPromptDialog").addEventListener("close", () => { $("#externalPromptText").value = ""; });
+
 $("#summaryBtn").addEventListener("click", async () => {
   if (!S.archive.id) return toast("회의를 고르세요", true);
   if (stillWriting(S.archive.id)) return toast("받아쓰기가 끝난 뒤에 요약할 수 있습니다. 마지막 문장을 정리하는 중이면 잠시 기다려 주세요.", true);

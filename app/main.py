@@ -1125,6 +1125,37 @@ async def api_export(session_id: str, format: str = "txt") -> Response:
 
 
 # ---------------------------------------------------------------- 요약
+def _summary_transcript(session_id: str, segments: list[dict]) -> str:
+    meta = session_mod.read_meta(session_id)
+    info = meta.get("info") or {}
+    head = "\n".join([
+        "[회의 정보 — 사용자가 적은 값. 빈 칸은 모름]",
+        f"회의명: {meta.get('title') or ''}",
+        f"일시: {info.get('date', '')}",
+        f"장소: {info.get('place', '')}",
+        f"참석 인원: {info.get('count', '')}",
+        f"참석자: {info.get('attendees', '')}",
+        "", "[녹취록]",
+    ])
+    return head + "\n" + export.plain_transcript(segments)
+
+
+@app.get("/api/sessions/{session_id}/summary-prompt")
+async def api_summary_prompt(session_id: str) -> Response:
+    if _still_writing(session_id):
+        raise HTTPException(400, "받아쓰기가 끝난 뒤에 프롬프트를 만들 수 있습니다. 마지막 문장을 정리하는 중이면 잠시 기다려 주세요.")
+    try:
+        store, _ = _store_for(session_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "세션을 찾을 수 없습니다.") from exc
+    segments = store.as_list()
+    if not segments:
+        raise HTTPException(400, "요약할 내용이 없습니다.")
+    prompt = summarize.share_prompt(_summary_transcript(session_id, segments))
+    return Response(prompt, media_type="text/plain; charset=utf-8",
+                    headers={"Cache-Control": "no-store"})
+
+
 def _run_summary(session_id: str, segments: list[dict], cfg: dict) -> None:
     state.summary_status = {"running": True, "message": "준비 중...", "error": None, "session_id": session_id}
     got: list[str] = []
@@ -1143,18 +1174,7 @@ def _run_summary(session_id: str, segments: list[dict], cfg: dict) -> None:
             state.publish({"type": "summary_delta", "session_id": session_id, "text": "".join(got)})
 
     try:
-        meta = session_mod.read_meta(session_id)
-        info = meta.get("info") or {}
-        head = "\n".join([
-            "[회의 정보 — 사용자가 적은 값. 빈 칸은 모름]",
-            f"회의명: {meta.get('title') or ''}",
-            f"일시: {info.get('date', '')}",
-            f"장소: {info.get('place', '')}",
-            f"참석 인원: {info.get('count', '')}",
-            f"참석자: {info.get('attendees', '')}",
-            "", "[녹취록]",
-        ])
-        text = summarize.summarize(head + "\n" + export.plain_transcript(segments), cfg, progress, on_text)
+        text = summarize.summarize(_summary_transcript(session_id, segments), cfg, progress, on_text)
         (paths.SESSIONS_DIR / session_id / "summary.md").write_text(text, "utf-8")
         state.summary_status = {"running": False, "message": "완료", "error": None, "session_id": session_id}
         state.publish({"type": "summary_done", "session_id": session_id, "summary": text})

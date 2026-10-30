@@ -2040,6 +2040,17 @@ dialog .modal-box {
 #actionText {
   min-height: 160px;
 }
+.external-prompt-box {
+  width: min(720px, calc(100vw - 32px));
+}
+#externalPromptText {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
 #actionMessage:empty {
   display: none;
 }
