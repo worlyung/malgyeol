@@ -537,6 +537,37 @@ async def api_sessions() -> dict:
     return {"sessions": session_mod.list_sessions(), "folders": session_mod.list_folders()}
 
 
+@app.get("/api/session-search")
+async def api_session_search(q: str = "") -> dict:
+    query = q.strip().casefold()
+    if not query:
+        return {"matches": {}}
+    matches = {}
+    for meta in session_mod.list_sessions():
+        session_id = meta.get("id")
+        if not session_id:
+            continue
+        try:
+            _, store = session_mod.load_session(session_id)
+            hits = []
+            for segment in store.as_list():
+                text = segment.get("text", "")
+                if query in text.casefold():
+                    hits.append({"kind": "녹취", "text": text, "start": segment.get("start", 0)})
+            folder = paths.SESSIONS_DIR / session_id
+            for filename, kind in (("memo.txt", "메모"), ("summary.md", "요약")):
+                path = folder / filename
+                if path.exists():
+                    for line in path.read_text("utf-8").splitlines():
+                        if query in line.casefold():
+                            hits.append({"kind": kind, "text": line, "start": None})
+            if hits:
+                matches[session_id] = hits[:20]
+        except (OSError, ValueError, TypeError):
+            logging.exception("회의 검색 실패: %s", session_id)
+    return {"matches": matches}
+
+
 @app.post("/api/folders")
 async def api_add_folder(payload: dict = Body(...)) -> dict:
     name = str(payload.get("name") or "").strip()
