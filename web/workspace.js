@@ -297,6 +297,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document
     .getElementById("sessionSearch")
-    .addEventListener("input", paintSessions);
+    .addEventListener("input", scheduleSessionSearch);
   paintWorkspaceState();
 });
