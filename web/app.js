@@ -1430,10 +1430,33 @@ async function loadSessions() {
   paintSessions();
 }
 
+let sessionSearchMatches = {};
+let sessionSearchTimer = null;
+let sessionSearchGeneration = 0;
+
+function scheduleSessionSearch() {
+  const query = $("#sessionSearch").value.trim();
+  const generation = ++sessionSearchGeneration;
+  clearTimeout(sessionSearchTimer);
+  sessionSearchMatches = {};
+  paintSessions();
+  if (!query) return;
+  sessionSearchTimer = setTimeout(async () => {
+    try {
+      const result = await api(`/api/session-search?q=${encodeURIComponent(query)}`);
+      if (generation !== sessionSearchGeneration) return;
+      sessionSearchMatches = result.matches || {};
+      paintSessions();
+    } catch (error) {
+      if (generation === sessionSearchGeneration) toast("검색하지 못했습니다: " + error.message, true);
+    }
+  }, 300);
+}
+
 function paintSessions() {
   const sessions = S.sessions || [];
   const query = $("#sessionSearch").value.trim().toLocaleLowerCase();
-  const filtered = sessions.filter(s => (!S.folder || s.folder === S.folder) && (!query || (s.title || s.id).toLocaleLowerCase().includes(query)));
+  const filtered = sessions.filter(s => (!S.folder || s.folder === S.folder) && (!query || (s.title || s.id).toLocaleLowerCase().includes(query) || sessionSearchMatches[s.id]));
   $("#sessionCount").textContent = String(filtered.length);
   const box = $("#sessionList");
   box.innerHTML = "";
@@ -1455,6 +1478,24 @@ function paintSessions() {
         </div></div>
       <div class="m">${date.toLocaleString("ko-KR")} · ${hms(s.duration || 0)} · ${s.segments || 0}문장${s.has_summary ? " · 요약✓" : ""}</div>`;
     el.querySelector(".sess-name").textContent = s.title || s.id;
+    if (query && sessionSearchMatches[s.id]) {
+      const results = document.createElement("div");
+      for (const hit of sessionSearchMatches[s.id]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "mini";
+        button.textContent = hit.kind + (hit.start === null ? "" : " " + hms(hit.start)) + " · " + hit.text.slice(0, 100);
+        button.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          try {
+            await openSession(s.id);
+            if (hit.start !== null && S.archive.id === s.id) playFrom(hit.start);
+          } catch (error) { toast("회의를 열지 못했습니다: " + error.message, true); }
+        });
+        results.appendChild(button);
+      }
+      el.appendChild(results);
+    }
     el.addEventListener("click", (ev) => {
       if (ev.target.closest(".sess-tools")) return;
       openSession(s.id).catch(e => toast("회의를 열지 못했습니다: " + e.message, true));
