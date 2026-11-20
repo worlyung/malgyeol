@@ -75,6 +75,11 @@ def pick_device(device: str, compute_type: str) -> tuple[str, str]:
             import ctranslate2
 
             device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+            if device == "cuda" and os.name == "nt":
+                import importlib.util
+
+                if importlib.util.find_spec("nvidia") is None:
+                    device = "cpu"
         except Exception:  # noqa: BLE001
             device = "cpu"
     if compute_type == "auto":

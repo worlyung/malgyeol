@@ -70,6 +70,12 @@ PROMPT = """다음은 회의 녹취록입니다. 아래 형식의 한국어 요�
 {transcript}
 """
 
+
+def share_prompt(transcript: str) -> str:
+    """외부 AI 대화창에 한 번에 붙여 넣을 요약 요청문."""
+    return SYSTEM + "\n\n" + PROMPT.format(transcript=transcript)
+
+
 MERGE_PROMPT = """아래는 같은 회의의 녹취록을 앞에서부터 나눠 요약한 것입니다.
 중복을 없애고 시간 순서대로 하나의 회의 요약문으로 합치십시오.
 형식은 각 부분 요약과 동일하게 유지하십시오.

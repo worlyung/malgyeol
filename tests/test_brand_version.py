@@ -7,9 +7,9 @@ from app import version
 
 class BrandVersionTests(unittest.TestCase):
     def test_brand_version(self):
-        self.assertEqual(version.VERSION, "1.01")
+        self.assertEqual(version.VERSION, "1.03")
         self.assertEqual(version.parse("1.00"), (1, 0, 0))
-        self.assertGreater(version.parse("1.01"), version.parse("1.00"))
+        self.assertGreater(version.parse("1.02"), version.parse("1.01"))
 
     def test_legacy_release_is_not_offered(self):
         response = Mock(content=json.dumps({"version": "1.0.7"}).encode())

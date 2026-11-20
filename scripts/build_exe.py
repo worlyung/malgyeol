@@ -1,6 +1,8 @@
 """다른 PC에 건네줄 '단일 exe' 만들기.
 
-    python -m scripts.build_exe                 # 배포용: 모델 + 명부(이름·직함), 얼굴·성문 없음 (약 1GB)
+    python -m scripts.build_exe                 # 배포용(Soniox판): PC 위스퍼 모델·그래픽카드 부품 없이 + 명부(이름·직함)
+                                                #   PC 위스퍼는 설치 뒤 설정 → 음성인식에서 필요한 사람만 받습니다
+    python -m scripts.build_exe --with-whisper  # 예전 전체판: PC 위스퍼 모델·그래픽카드 부품까지 (약 1.9GB)
     python -m scripts.build_exe --with-members  # 개인용: 명부·얼굴·성문까지 → 회의받아쓰기_설치_개인용.exe
     python -m scripts.build_exe --no-models     # 경량판: 모델 없이, 설치할 때 인터넷에서 받음 (명부 이름·용어사전은 포함, 얼굴·성문 없음)
                                                 #   → 회의받아쓰기_설치_경량.exe
@@ -96,7 +98,15 @@ def build_payload_folder(name: str, with_models: bool, with_members: bool, with_
     return target
 
 
-def zip_payload(folder: Path, dest: Path, with_members: bool, with_roster: bool) -> Path:
+# PC 위스퍼(선택 설치) 몫: 음성인식 모델과 NVIDIA 그래픽카드 부품. 합쳐서 약 2.9GB.
+def _whisper_part(rel: Path) -> bool:
+    return (rel.parts[:3] == ("data", "models", "whisper")
+            or (rel.parts[:3] == ("python", "Lib", "site-packages") and len(rel.parts) > 3
+                and rel.parts[3].lower().startswith("nvidia")))
+
+
+def zip_payload(folder: Path, dest: Path, with_members: bool, with_roster: bool,
+                with_whisper: bool = False) -> Path:
     """폴더를 zip 하나로 묶습니다. (경로는 폴더 안쪽 기준)
 
     정해진 파일만 담습니다. 꾸러미 폴더에서 프로그램을 실행해 보면 녹음·설정(API 키)·실행 기록이 쌓이는데,
@@ -109,7 +119,8 @@ def zip_payload(folder: Path, dest: Path, with_members: bool, with_roster: bool)
     files = [f for f in folder.rglob("*")
              if f.is_file() and "__pycache__" not in f.parts and f.suffix != ".pyc"
              and (f.name == LAUNCHER_NAME and f.parent == folder
-                  or _zip_allowed(f.relative_to(folder), with_members, with_roster))]
+                  or _zip_allowed(f.relative_to(folder), with_members, with_roster))
+             and (with_whisper or not _whisper_part(f.relative_to(folder)))]
     total = sum(f.stat().st_size for f in files)
     print(f"[2/4] 압축 중: 파일 {len(files)}개 / {total / 1073741824:.1f}GB (몇 분 걸립니다)")
     done = 0
@@ -221,6 +232,7 @@ def concat(stub: Path, payload: Path, dest: Path) -> Path:
 def main() -> int:
     ap = argparse.ArgumentParser(description="단일 exe 만들기")
     ap.add_argument("--no-models", action="store_true", help="음성인식 모델 빼기")
+    ap.add_argument("--with-whisper", action="store_true", help="PC 위스퍼 모델·그래픽카드 부품까지 넣기 (예전 전체판)")
     ap.add_argument("--with-members", action="store_true", help="등록된 사람(얼굴·목소리 특징)까지 넣기 (내부용)")
     ap.add_argument("--no-roster", action="store_true", help="명부(이름·직함)도 빼기")
     ap.add_argument("--fresh", action="store_true", help="파이썬 꾸러미부터 새로 만들기")
@@ -262,7 +274,8 @@ def main() -> int:
         source_file.unlink(missing_ok=True)
     # 배포용·개인용·경량판이 서로 덮어쓰지 않도록 이름을 나눕니다
     suffix = "_개인용" if args.with_members else ("_경량" if args.no_models else "")
-    payload_zip = zip_payload(folder, WORK / f"payload{suffix}.zip", args.with_members, with_roster)
+    payload_zip = zip_payload(folder, WORK / f"payload{suffix}.zip", args.with_members, with_roster,
+                              with_whisper=args.with_whisper or args.no_models)
     stub = build_installer_exe()
     exe_name = (args.exe_name or (EXE_NAME.removesuffix(".exe") + suffix)).removesuffix(".exe") + ".exe"
     dest = concat(stub, payload_zip, BUILD / exe_name)

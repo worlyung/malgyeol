@@ -137,7 +137,8 @@ class AppState:
     def get_engine(self, acfg: dict):
         key = json.dumps(
             {k: acfg.get(k) for k in ("engine", "model", "device", "compute_type", "language",
-                                      "beam_size", "cpu_threads", "simulwhisper_path")},
+                                      "beam_size", "cpu_threads", "simulwhisper_path")}
+            | {"soniox": bool(config.soniox_key())},          # 키를 넣거나 빼면 엔진을 다시 고릅니다
             sort_keys=True,
         )
         if self.engine is None or key != self._engine_key:
@@ -342,6 +343,9 @@ async def api_set_settings(patch: dict = Body(...)) -> dict:
     el = (patch.get("speaker") or {}).get("elevenlabs_key")
     if el and set(el[:-4]) == {"*"}:
         patch["speaker"].pop("elevenlabs_key")
+    sx = (patch.get("asr") or {}).get("soniox_key")
+    if sx and set(sx[:-4]) == {"*"}:
+        patch["asr"].pop("soniox_key")
     before = config.load()
     config.save(patch)
     _apply_live_settings(before, config.load())
@@ -1125,6 +1129,37 @@ async def api_export(session_id: str, format: str = "txt") -> Response:
 
 
 # ---------------------------------------------------------------- 요약
+def _summary_transcript(session_id: str, segments: list[dict]) -> str:
+    meta = session_mod.read_meta(session_id)
+    info = meta.get("info") or {}
+    head = "\n".join([
+        "[회의 정보 — 사용자가 적은 값. 빈 칸은 모름]",
+        f"회의명: {meta.get('title') or ''}",
+        f"일시: {info.get('date', '')}",
+        f"장소: {info.get('place', '')}",
+        f"참석 인원: {info.get('count', '')}",
+        f"참석자: {info.get('attendees', '')}",
+        "", "[녹취록]",
+    ])
+    return head + "\n" + export.plain_transcript(segments)
+
+
+@app.get("/api/sessions/{session_id}/summary-prompt")
+async def api_summary_prompt(session_id: str) -> Response:
+    if _still_writing(session_id):
+        raise HTTPException(400, "받아쓰기가 끝난 뒤에 프롬프트를 만들 수 있습니다. 마지막 문장을 정리하는 중이면 잠시 기다려 주세요.")
+    try:
+        store, _ = _store_for(session_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "세션을 찾을 수 없습니다.") from exc
+    segments = store.as_list()
+    if not segments:
+        raise HTTPException(400, "요약할 내용이 없습니다.")
+    prompt = summarize.share_prompt(_summary_transcript(session_id, segments))
+    return Response(prompt, media_type="text/plain; charset=utf-8",
+                    headers={"Cache-Control": "no-store"})
+
+
 def _run_summary(session_id: str, segments: list[dict], cfg: dict) -> None:
     state.summary_status = {"running": True, "message": "준비 중...", "error": None, "session_id": session_id}
     got: list[str] = []
@@ -1143,18 +1178,7 @@ def _run_summary(session_id: str, segments: list[dict], cfg: dict) -> None:
             state.publish({"type": "summary_delta", "session_id": session_id, "text": "".join(got)})
 
     try:
-        meta = session_mod.read_meta(session_id)
-        info = meta.get("info") or {}
-        head = "\n".join([
-            "[회의 정보 — 사용자가 적은 값. 빈 칸은 모름]",
-            f"회의명: {meta.get('title') or ''}",
-            f"일시: {info.get('date', '')}",
-            f"장소: {info.get('place', '')}",
-            f"참석 인원: {info.get('count', '')}",
-            f"참석자: {info.get('attendees', '')}",
-            "", "[녹취록]",
-        ])
-        text = summarize.summarize(head + "\n" + export.plain_transcript(segments), cfg, progress, on_text)
+        text = summarize.summarize(_summary_transcript(session_id, segments), cfg, progress, on_text)
         (paths.SESSIONS_DIR / session_id / "summary.md").write_text(text, "utf-8")
         state.summary_status = {"running": False, "message": "완료", "error": None, "session_id": session_id}
         state.publish({"type": "summary_done", "session_id": session_id, "summary": text})
@@ -1476,6 +1500,55 @@ async def api_member_photo(member_id: str, name: str) -> FileResponse:
 
 
 # ---------------------------------------------------------------- 파일 업로드(받아쓰기용)
+# PC 위스퍼(선택 설치): 인터넷이 안 되거나 녹음을 밖으로 보내면 안 되는 회의용.
+# 기본 설치에는 빠져 있어(약 3GB) 필요한 사람만 받습니다.
+WHISPER_JOB: dict = {"state": "idle", "message": ""}       # idle | running | done | error
+
+
+@app.get("/api/whisper")
+async def api_whisper() -> dict:
+    from .asr import whisper_installed
+
+    return {"installed": whisper_installed(), **WHISPER_JOB}
+
+
+@app.post("/api/whisper/install")
+async def api_whisper_install() -> dict:
+    if WHISPER_JOB["state"] != "running":
+        WHISPER_JOB.update(state="running", message="준비 중...")
+        threading.Thread(target=_install_whisper, name="whisper-install", daemon=True).start()
+    return dict(WHISPER_JOB)
+
+
+def _install_whisper() -> None:
+    import subprocess
+
+    flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
+    def run(args: list[str], message: str) -> None:
+        WHISPER_JOB["message"] = message
+        proc = subprocess.run([sys.executable, *args], cwd=str(paths.ROOT), capture_output=True,
+                              text=True, encoding="utf-8", errors="replace", creationflags=flags)
+        if proc.returncode != 0:
+            raise RuntimeError((proc.stderr or proc.stdout).strip().splitlines()[-1:] or ["실패"])
+
+    try:
+        try:
+            import ctranslate2
+
+            gpu = ctranslate2.get_cuda_device_count() > 0
+        except Exception:  # noqa: BLE001
+            gpu = False
+        if gpu and sys.platform == "win32":
+            run(["-m", "pip", "install", "-q", "--no-warn-script-location",
+                 "nvidia-cublas-cu12", "nvidia-cudnn-cu12"], "그래픽카드용 부품 받는 중... (약 2GB)")
+        run(["-m", "scripts.download_models", "--whisper"], "음성인식 모델 받는 중... (약 1.6GB)")
+        WHISPER_JOB.update(state="done", message="설치했습니다. 받아쓰기 방식에서 'PC 위스퍼'를 고를 수 있습니다.")
+    except Exception as exc:  # noqa: BLE001
+        log.exception("PC 위스퍼 설치 실패")
+        WHISPER_JOB.update(state="error", message=f"설치하지 못했습니다: {exc}")
+
+
 @app.post("/api/upload")
 async def api_upload(file: UploadFile = File(...)) -> dict:
     UPLOADS.mkdir(parents=True, exist_ok=True)

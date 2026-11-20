@@ -82,7 +82,7 @@ function paintEmptyTranscript(container) {
       : selected
         ? "받아쓰기 상태를 확인하거나 다른 회의를 선택해 주세요."
         : "왼쪽에서 회의를 고르면 녹취록과 요약을 볼 수 있습니다.<br>문장을 눌러 녹음을 들으며 검수하세요.";
-  container.innerHTML = `<div class="empty-state"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M9 12h6m-6 4h4"/></svg></span><b>${title}</b><p>${detail}</p><span class="empty-foot">${live ? "음성인식은 이 PC에서 처리합니다" : "회의 기록 · 녹음 · AI 요약을 한곳에서"}</span></div>`;
+  container.innerHTML = `<div class="empty-state"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M9 12h6m-6 4h4"/></svg></span><b>${title}</b><p>${detail}</p><span class="empty-foot">${live ? "받아쓴 기록은 이 PC에 저장됩니다" : "회의 기록 · 녹음 · AI 요약을 한곳에서"}</span></div>`;
 }
 
 function paintWorkspaceState() {

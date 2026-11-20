@@ -1813,6 +1813,50 @@ $$("[data-aexport]").forEach((b) => b.addEventListener("click", () => {
 // 받아쓰는 중이거나 마지막 문장을 정리하는 중인 회의 (지우거나 요약하면 녹취가 빠지거나 파일이 깨질 수 있음)
 function stillWriting(id) { return S.running && !!id && id === S.sessionId; }
 
+$("#externalSummaryBtn").addEventListener("click", async () => {
+  const id = S.archive.id;
+  if (!id) return toast("회의를 고르세요", true);
+  if (stillWriting(id)) return toast("받아쓰기가 끝난 뒤에 프롬프트를 만들 수 있습니다.", true);
+  const button = $("#externalSummaryBtn");
+  button.disabled = true;
+  try {
+    const response = await api(`/api/sessions/${encodeURIComponent(id)}/summary-prompt`);
+    const prompt = await response.text();
+    if (S.archive.id !== id) return toast("회의가 바뀌었습니다. 다시 눌러 주세요.", true);
+    $("#externalPromptText").value = prompt;
+    $("#externalPromptDialog").showModal();
+    $("#externalPromptCopy").focus();
+    $("#externalPromptText").scrollTop = 0;
+  } catch (e) { toast("프롬프트를 만들지 못했습니다: " + e.message, true); }
+  finally { button.disabled = false; }
+});
+
+$("#externalPromptCopy").addEventListener("click", async () => {
+  const field = $("#externalPromptText");
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("클립보드를 사용할 수 없습니다.");
+    await navigator.clipboard.writeText(field.value);
+    toast("프롬프트를 복사했습니다. 붙여넣기 결과를 확인해 주세요.");
+  } catch (e) {
+    field.focus();
+    field.select();
+    toast("자동 복사가 안 됩니다. Ctrl+C로 복사하거나 TXT 파일을 받으세요.", true);
+  }
+});
+
+$("#externalPromptDownload").addEventListener("click", () => {
+  const url = URL.createObjectURL(new Blob([$("#externalPromptText").value], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "말결-외부-AI-요약-프롬프트.txt";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("프롬프트 TXT 파일을 받았습니다.");
+});
+
+$("#externalPromptClose").addEventListener("click", () => $("#externalPromptDialog").close());
+$("#externalPromptDialog").addEventListener("close", () => { $("#externalPromptText").value = ""; });
+
 $("#summaryBtn").addEventListener("click", async () => {
   if (!S.archive.id) return toast("회의를 고르세요", true);
   if (stillWriting(S.archive.id)) return toast("받아쓰기가 끝난 뒤에 요약할 수 있습니다. 마지막 문장을 정리하는 중이면 잠시 기다려 주세요.", true);
@@ -1850,6 +1894,9 @@ function fillSettings(cfg) {
   if (!S.running) { S.liveModes = null; }
   setTimeout(() => { paintModes("live"); paintModes("archive"); });
   const a = cfg.asr, sp = cfg.speaker, g = cfg.glossary, su = cfg.summary;
+  $("#setEngine").value = a.engine === "auto" || a.engine === "soniox" ? "auto" : "whisper";
+  $("#setSonioxKey").value = a.soniox_key || "";
+  paintWhisper(a.whisper_installed);
   $("#setWhisperModel").value = a.model === "large-v3-turbo" ? "" : (a.model || "");
   $("#setDeviceType").value = a.device;
   $("#setCompute").value = a.compute_type; $("#setLang").value = a.language;
@@ -1886,12 +1933,14 @@ async function loadMonitors(sel) {
 const SETTING_IDS = ["setPerf", "setWhisperModel", "setDeviceType", "setCompute", "setLang",
                      "setSilence", "setBeam", "setThreads", "setLowPrio", "setFace", "setMonitor",
                      "setFaceTh", "setVoice", "setVoiceTh", "setAutoEnroll", "setContext", "setCorrect", "setCorrectTh", "setProvider",
-                     "setKey", "setSumModel", "setElevenKey"];
+                     "setKey", "setSumModel", "setElevenKey", "setEngine", "setSonioxKey"];
 
 function collectSettings() {
   const num = (id) => parseFloat($(id).value);
   return {
     asr: {
+      engine: $("#setEngine").value,
+      soniox_key: $("#setSonioxKey").value,
       model: $("#setWhisperModel").value.trim() || "large-v3-turbo",
       device: $("#setDeviceType").value,
       compute_type: $("#setCompute").value, language: $("#setLang").value,
@@ -2098,6 +2147,29 @@ function paintKeyState() {
   el.className = "hint " + (ok ? "ok" : "missing");
 }
 
+// PC 위스퍼(선택 설치) 상태와 설치 단추
+function paintWhisper(installed, job) {
+  const st = $("#whisperState"), btn = $("#installWhisper");
+  const running = job?.state === "running";
+  st.textContent = running || job?.state === "error" ? job.message
+    : installed ? "PC 위스퍼가 설치되어 있습니다." : "PC 위스퍼는 아직 설치하지 않았습니다.";
+  btn.classList.toggle("hidden", !!installed && !running);
+  btn.disabled = running;
+  $("#setEngine").querySelector('option[value="whisper"]').disabled = !installed;
+}
+
+async function installWhisper() {
+  if (!confirm("PC 위스퍼를 설치할까요? 인터넷에서 약 3GB를 받습니다(수 분~수십 분).")) return;
+  let job = await api("/api/whisper/install", { method: "POST" });
+  paintWhisper(false, job);
+  while (job.state === "running") {
+    await new Promise((r) => setTimeout(r, 2000));
+    job = await api("/api/whisper");
+    paintWhisper(job.installed, job);
+  }
+  toast(job.message, job.state === "error");
+}
+
 function openKeyGuide() { window.open("/static/api-key-guide.html", "_blank"); }
 
 function showKeyGuide(reason) {
@@ -2107,6 +2179,7 @@ function showKeyGuide(reason) {
 $("#keyClose").addEventListener("click", () => $("#keyModal").classList.add("hidden"));
 $("#keyGuide").addEventListener("click", openKeyGuide);
 $("#openKeyGuide").addEventListener("click", openKeyGuide);
+$("#installWhisper").addEventListener("click", installWhisper);
 $("#keyGoSettings").addEventListener("click", () => {
   $("#keyModal").classList.add("hidden");
   showTab("settings");

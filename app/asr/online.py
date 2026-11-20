@@ -312,6 +312,8 @@ class NativeStreamingASR:
         self.min_chunk_sec = min_chunk_sec
         self.committed: list[Word] = []
         self.last_iteration_sec = 0.0
+        if hasattr(engine, "begin"):          # 회의마다 새로 (엔진은 회의 사이에 재사용됩니다)
+            engine.begin()
         self.reset()
 
     def reset(self, offset: float = 0.0) -> None:
@@ -349,7 +351,8 @@ class NativeStreamingASR:
         words = self.engine.step(final=final)
         self.last_iteration_sec = _t.monotonic() - t0
         self.committed.extend(words)
-        return words, []
+        partial = self.engine.partial_words() if hasattr(self.engine, "partial_words") else []
+        return words, partial
 
     def finish(self) -> list[Word]:
         return self.process_iter(final=True)[0]
