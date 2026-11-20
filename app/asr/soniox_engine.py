@@ -196,10 +196,11 @@ class SonioxEngine(ASREngine):
         raise NotImplementedError("Soniox 엔진은 실시간 스트리밍 전용입니다.")
 
     # ------------------------------------------------------------ 녹음 파일 (한 번에)
-    def transcribe_file(self, audio: np.ndarray) -> list[Word]:
+    def transcribe_file(self, audio: np.ndarray, diarize: bool = False) -> tuple[list[Word], list[str]]:
         """녹음 파일은 실시간 연결(실제 속도로만 처리) 대신 파일 전사로 한 번에 받습니다.
 
         실측: 45분 회의 → 41초. 서버에 올린 소리와 결과는 받자마자 지웁니다.
+        diarize 면 낱말마다 화자 표시도 함께 돌려줍니다(아니면 빈 문자열).
         """
         import io
         import time
@@ -225,7 +226,8 @@ class SonioxEngine(ASREngine):
                             files={"file": ("audio.wav", buf.getvalue(), "audio/wav")}))["id"]
             tid = None
             try:
-                body = {"model": MODEL.replace("-rt-", "-async-"), "file_id": fid}
+                body = {"model": MODEL.replace("-rt-", "-async-"), "file_id": fid,
+                        "enable_speaker_diarization": diarize}
                 if self.language:
                     body["language_hints"] = [self.language]
                 terms = glossary_terms()
@@ -246,5 +248,7 @@ class SonioxEngine(ASREngine):
                         c.delete(url, headers=h)
                     except Exception:  # noqa: BLE001
                         log.warning("Soniox 서버의 사본을 지우지 못했습니다: %s", url)
-        return [Word(t["start_ms"] / 1000, t["end_ms"] / 1000, t["text"], float(t.get("confidence", 1.0)))
-                for t in tokens if "start_ms" in t and t.get("text") not in ("<end>", "<fin>")]
+        tokens = [t for t in tokens if "start_ms" in t and t.get("text") not in ("<end>", "<fin>")]
+        words = [Word(t["start_ms"] / 1000, t["end_ms"] / 1000, t["text"], float(t.get("confidence", 1.0)))
+                 for t in tokens]
+        return words, [str(t.get("speaker") or "") for t in tokens]
