@@ -468,6 +468,9 @@ class Session:
     def _asr_loop(self) -> None:
         reader_alive = True
         try:
+            if hasattr(self.engine, "transcribe_file") and not getattr(self.source, "realtime", True):
+                self._file_loop()
+                return
             while True:
                 self._drain()
                 reader_alive = any(t.name == "session-reader" and t.is_alive() for t in self._threads)
@@ -510,6 +513,33 @@ class Session:
             self.store.save(force=True)
             self._emit({"type": "status", "status": self.status()})
             self._finish_by_itself()
+
+    def _file_loop(self) -> None:
+        """녹음 파일: 소리를 끝까지 모은 뒤 엔진의 파일 전사로 한 번에 받아 문장으로 나눕니다."""
+        chunks: list[np.ndarray] = []
+        while True:
+            with self._pending_lock:
+                if not self._pending:
+                    self._pending_lock.wait(0.2)
+                chunks += self._pending
+                self._pending = []
+                self._pending_lock.notify_all()          # 입력 쪽이 기다리고 있으면 계속 읽게
+            reader_alive = any(t.name == "session-reader" and t.is_alive() for t in self._threads)
+            if (self._stop.is_set() or self._input_done.is_set()) and not reader_alive:
+                with self._pending_lock:
+                    chunks += self._pending
+                    self._pending = []
+                break
+        if not chunks:
+            return
+        audio = np.concatenate(chunks)
+        self._emit({"type": "log", "message": f"녹음 {len(audio) / SR / 60:.0f}분을 Soniox로 받아쓰는 중..."})
+        t0 = time.monotonic()
+        for w in self.engine.transcribe_file(audio):
+            self._cur_words.append(w)
+            self._maybe_close_segment(final=False)
+        self.online.last_iteration_sec = time.monotonic() - t0
+        self._emit({"type": "log", "message": f"받아쓰기 완료 ({self.online.last_iteration_sec:.0f}초)"})
 
     def _run_iteration(self, final: bool) -> None:
         self._speech_since_run = False

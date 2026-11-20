@@ -322,7 +322,7 @@
     <div class="page-grid">
       <section class="card span-2 setting-panel" data-setting-panel="ai">
         <div class="card-head"><b>AI 연결</b><span class="count">요약·메모 반영</span></div>
-        <div class="hint">요약할 때, 그리고 맥락 화자 구분에서 규칙으로 못 알아본 지명 문장이 있을 때만 그 문장이 외부로 전송됩니다. 받아쓰기·얼굴·목소리·자기소개 구분은 이 PC에서 처리합니다.</div>
+        <div class="hint">요약할 때, 그리고 맥락 화자 구분에서 규칙으로 못 알아본 지명 문장이 있을 때만 그 문장이 외부로 전송됩니다. 받아쓰기는 Soniox(기본)를 쓰면 회의 소리가 Soniox 서버로 전송되고, PC 위스퍼를 고르면 이 PC에서만 처리합니다. 얼굴·목소리·자기소개 구분은 이 PC에서 처리합니다.</div>
         <div class="form">
           <label>제공자<select id="setProvider">
             <option value="claude_cli">Claude Code 로그인 (기본)</option>
@@ -344,7 +344,26 @@
       </section>
 
       <section class="card span-2 setting-panel hidden" data-setting-panel="recognition">
-        <div class="card-head"><b>음성인식 세부</b></div>
+        <div class="card-head"><b>받아쓰기 방식</b></div>
+        <div class="hint">
+          Soniox는 인터넷으로 받아씁니다. 고유명사·사투리를 PC 위스퍼보다 훨씬 잘 알아듣고, 화자도 덜 헷갈립니다(1시간에 약 170원).
+          인터넷이 안 되거나 녹음을 밖으로 보내면 안 되는 회의는 PC 위스퍼를 설치해 쓰세요.
+        </div>
+        <div class="form">
+          <label>방식<select id="setEngine">
+            <option value="auto">Soniox (인터넷 · 권장)</option><option value="whisper">PC 위스퍼 (인터넷 없이)</option>
+          </select></label>
+          <label>Soniox API 키<input id="setSonioxKey" type="password" placeholder="soniox.com 에서 발급" autocomplete="off"></label>
+        </div>
+        <div class="row">
+          <span id="whisperState" class="hint"></span>
+          <span class="spacer"></span>
+          <button id="installWhisper" class="mini">PC 위스퍼 설치 (약 3GB)</button>
+        </div>
+      </section>
+
+      <section class="card span-2 setting-panel hidden" data-setting-panel="recognition">
+        <div class="card-head"><b>음성인식 세부 (PC 위스퍼)</b></div>
         <div class="hint">
           평소 쓰는 Whisper 모델 폴더를 지정할 수 있습니다. 열 수 없으면 이 프로그램의 기본 모델을 사용합니다.
           스레드를 12개로 늘려도 6개 대비 12%밖에 빨라지지 않으므로 기본값(물리 코어 − 2)을 권합니다.

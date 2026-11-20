@@ -122,10 +122,9 @@ MODEL_DISK_EXTRA = 2.6 * 1073741824         # 받는 동안 잠깐 더 필요한
 
 
 def models_missing(target: Path) -> bool:
-    """설치 폴더에 음성인식·얼굴·화자 모델이 다 있는지."""
+    """설치 폴더에 얼굴·화자 모델이 다 있는지. (받아쓰기는 Soniox 가 기본이라 PC 위스퍼 모델은 선택입니다)"""
     models = target / "data" / "models"
-    has_whisper = any((models / "whisper").glob("*/model.bin"))
-    return not has_whisper or not all((models / name).exists() for name in AUX_MODELS)
+    return not all((models / name).exists() for name in AUX_MODELS)
 
 
 def same_model_file(target: Path, member: zipfile.ZipInfo, check_crc: bool = True) -> bool:
@@ -154,7 +153,26 @@ def same_model_file(target: Path, member: zipfile.ZipInfo, check_crc: bool = Tru
 
 
 def payload_has_models(zf: zipfile.ZipFile) -> bool:
-    return any(n.startswith("data/models/whisper/") and n.endswith("model.bin") for n in zf.namelist())
+    names = set(zf.namelist())
+    return all(f"data/models/{name}" in names for name in AUX_MODELS)
+
+
+# 설정에서 따로 받은 PC 위스퍼 그래픽카드 부품(약 2GB)은 다시 설치해도 남겨 둡니다
+def stash_gpu_parts(target: Path) -> list[Path]:
+    keep = target / "_gpu_parts"
+    for p in (target / "python" / "Lib" / "site-packages").glob("nvidia*"):
+        keep.mkdir(exist_ok=True)
+        shutil.move(str(p), str(keep / p.name))
+    return sorted(keep.glob("nvidia*")) if keep.exists() else []   # 지난번 설치가 멈춰 남은 것도
+
+
+def restore_gpu_parts(target: Path, moved: list[Path]) -> None:
+    site = target / "python" / "Lib" / "site-packages"
+    for p in moved:
+        dest = site / p.name
+        if not dest.exists():
+            shutil.move(str(p), str(dest))
+    shutil.rmtree(target / "_gpu_parts", ignore_errors=True)
 
 
 class _Slice:
@@ -610,11 +628,16 @@ class Installer(tk.Tk):
             self.after(0, lambda: self._fail("이 파일에는 설치할 내용이 들어 있지 않습니다."))
             return
 
+        gpu_parts: list[Path] = []
         try:
+            if mode in ("fresh", "update") and target.exists():
+                gpu_parts = stash_gpu_parts(target)
             if mode == "fresh":
                 # 음성인식 모델(약 0.9GB)은 사용자 데이터가 아니므로 남겨 두어 다시 받지 않게 합니다
                 self.after(0, lambda: self.say("기존 폴더를 지우는 중... (음성인식 모델은 남겨 둡니다)"))
                 for item in target.iterdir():
+                    if item.name == "_gpu_parts":
+                        continue
                     if item.name == "data":
                         for sub in item.iterdir():
                             if sub.name != "models":
@@ -657,6 +680,7 @@ class Installer(tk.Tk):
                 percent = done / total
                 self.after(0, lambda p=percent, d=done: self._progress(p, d, total))
             zf.close()
+            restore_gpu_parts(target, gpu_parts)
             target = target.resolve(strict=True)
 
             (target / VERSION_FILE).write_text(

@@ -13,7 +13,7 @@ from . import paths
 
 DEFAULTS: dict[str, Any] = {
     "asr": {
-        "engine": "faster-whisper",       # faster-whisper | lightning-simulwhisper
+        "engine": "auto",                 # auto(Soniox 키가 있으면 Soniox, 없으면 PC 위스퍼) | soniox | faster-whisper | lightning-simulwhisper
         "model": "large-v3-turbo",        # HuggingFace 이름 또는 로컬 CT2 디렉터리
         "device": "auto",                 # auto | cpu | cuda
         "compute_type": "auto",           # auto | int8 | int8_float16 | float16 | float32
@@ -115,6 +115,13 @@ def elevenlabs_key() -> str:
     return _read_api_key(ELEVENLABS_KEY) or ""
 
 
+SONIOX_KEY = "SONIOX_API_KEY"             # 받아쓰기(Soniox)용. data/.env 에만 둡니다
+
+
+def soniox_key() -> str:
+    return _read_api_key(SONIOX_KEY) or ""
+
+
 def _read_api_key(name: str = "SUMMARY_API_KEY") -> str | None:
     """data/.env 의 키를 읽습니다. 항목이 없으면 None을 돌려줍니다."""
     try:
@@ -170,6 +177,8 @@ def load() -> dict[str, Any]:
                     clean.replace(paths.SETTINGS_FILE)
                     stamp = _stamp()
                 _cache = _merge(DEFAULTS, saved)
+                if _cache["asr"].get("engine") == "faster-whisper":
+                    _cache["asr"]["engine"] = "auto"
                 for key in LEGACY_GLOSSARY_KEYS:     # 없앤 기능의 옛 설정은 버립니다 (다음 저장 때 파일에서도 빠짐)
                     _cache["glossary"].pop(key, None)
                 _cache_stamp = stamp
@@ -191,6 +200,9 @@ def save(patch: dict[str, Any]) -> dict[str, Any]:
         speaker_patch = patch.get("speaker")
         if isinstance(speaker_patch, dict) and "elevenlabs_key" in speaker_patch:
             _write_api_key(str(speaker_patch.pop("elevenlabs_key")).strip(), ELEVENLABS_KEY)
+        asr_patch = patch.get("asr")
+        if isinstance(asr_patch, dict) and "soniox_key" in asr_patch:
+            _write_api_key(str(asr_patch.pop("soniox_key")).strip(), SONIOX_KEY)
         merged = _merge(current, patch)
         merged["summary"]["api_key"] = _read_api_key() or ""
         paths.ensure_dirs()
@@ -212,6 +224,11 @@ def public() -> dict[str, Any]:
     cfg["summary"]["has_key"] = bool(key)
     el = elevenlabs_key()
     cfg["speaker"]["elevenlabs_key"] = ("*" * max(0, len(el) - 4) + el[-4:]) if el else ""
+    sx = soniox_key()
+    cfg["asr"]["soniox_key"] = ("*" * max(0, len(sx) - 4) + sx[-4:]) if sx else ""
+    from .asr import whisper_installed
+
+    cfg["asr"]["whisper_installed"] = whisper_installed()
     from . import summarize
 
     cfg["summary"]["ai_ready"] = summarize.available(cfg["summary"])
