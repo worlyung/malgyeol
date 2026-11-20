@@ -533,13 +533,40 @@ class Session:
         if not chunks:
             return
         audio = np.concatenate(chunks)
+        # 화자: 일레븐랩스 키가 있으면 '화자 다시 나누기'(더 정확, 실측 98% 대 90%)에 맡기고,
+        # 없으면 Soniox 화자 구분을 씁니다. (말결 자체 구분은 3명을 36명으로 나눌 만큼 흔들립니다)
+        from . import config
+
+        diarize = not config.elevenlabs_key()
         self._emit({"type": "log", "message": f"녹음 {len(audio) / SR / 60:.0f}분을 Soniox로 받아쓰는 중..."})
         t0 = time.monotonic()
-        for w in self.engine.transcribe_file(audio):
+        words, spks = self.engine.transcribe_file(audio, diarize=diarize)
+        first = len(self.store.segments)
+        for i, w in enumerate(words):
             self._cur_words.append(w)
-            self._maybe_close_segment(final=False)
+            # 사람이 바뀌는 곳에서는 문장을 끊습니다
+            turn = diarize and i + 1 < len(spks) and spks[i + 1] != spks[i]
+            self._maybe_close_segment(final=turn)
+        self._close_segment(force=True)
+        if diarize and any(spks):
+            self._apply_file_speakers(self.store.segments[first:], words, spks)
         self.online.last_iteration_sec = time.monotonic() - t0
         self._emit({"type": "log", "message": f"받아쓰기 완료 ({self.online.last_iteration_sec:.0f}초)"})
+
+    def _apply_file_speakers(self, segs: list[Segment], words: list[Word], spks: list[str]) -> None:
+        """문장마다 가장 오래 말한 Soniox 화자를 '화자 N'으로 붙입니다. (직접 지정한 것처럼 고정)"""
+        from .speakers.elevenlabs import _Timeline
+
+        tl = _Timeline([(w.start, w.end, s) for w, s in zip(words, spks)])
+        labels: dict[str, str] = {}
+        with self.store._lock:  # noqa: SLF001
+            for seg in segs:
+                spk = tl.majority(seg.start, seg.end)
+                seg.speaker = labels.setdefault(spk, f"화자 {len(labels) + 1}")
+                seg.speaker_id, seg.speaker_source, seg.speaker_score = None, "manual", 0.0
+        self.store.mark_dirty()
+        self.store.save(force=True)
+        self._emit({"type": "segments_update", "segments": [s.as_dict() for s in segs]})
 
     def _run_iteration(self, final: bool) -> None:
         self._speech_since_run = False
