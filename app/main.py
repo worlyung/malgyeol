@@ -1128,6 +1128,51 @@ async def api_export(session_id: str, format: str = "txt") -> Response:
     raise HTTPException(400, "지원하지 않는 형식입니다.")
 
 
+# ---------------------------------------------------------------- 공유 (카톡·텔레그램·메일)
+# 보내기는 사람이 직접 합니다. 말결은 붙여넣을 글과 끌어다 놓을 파일만 준비합니다. (잘못 나가면 되돌릴 수 없음)
+SHARE_DIR = Path.home() / "Documents" / "말결 공유"
+
+
+@app.get("/api/sessions/{session_id}/share-text")
+async def api_share_text(session_id: str, kind: str = "summary") -> dict:
+    store, meta = _store_for(session_id)
+    meta = {**session_mod.read_meta(session_id), **meta}
+    title, info = meta.get("title") or session_id, meta.get("info") or {}
+    if kind == "summary":
+        f = paths.SESSIONS_DIR / session_id / "summary.md"
+        if not f.exists():
+            raise HTTPException(404, "아직 AI 요약이 없습니다. 'AI 요약'을 먼저 만들거나 녹취록 전체를 보내세요.")
+        body = export.plain_summary(f.read_text("utf-8"))
+    elif kind == "transcript":
+        cfg = config.load()["export"]
+        body = export.to_text(store.as_list(), "", bool(cfg.get("timestamp", True)), bool(cfg.get("speaker", True)))
+    else:
+        raise HTTPException(400, "지원하지 않는 종류입니다.")
+    return {"title": f"[회의록] {title}", "text": export.share_text(title, info, body)}
+
+
+@app.post("/api/sessions/{session_id}/share-files")
+async def api_share_files(session_id: str) -> dict:
+    """녹취록(과 요약) Word 파일을 '문서\\말결 공유' 아래에 만들고 그 폴더를 엽니다."""
+    store, meta = _store_for(session_id)
+    meta = {**session_mod.read_meta(session_id), **meta}
+    title = meta.get("title") or session_id
+    cfg = config.load()["export"]
+    safe = re.sub(r'[\\/:*?"<>|]', "_", "".join(c for c in title if c >= " ")).strip(" .")[:80] or session_id
+    folder = SHARE_DIR / f"{session_id[:8]} {safe}"
+    folder.mkdir(parents=True, exist_ok=True)
+    files = [folder / f"{safe} 녹취록.docx"]
+    files[0].write_bytes(export.to_docx(store.as_list(), title, bool(cfg.get("timestamp", True)),
+                                        bool(cfg.get("speaker", True)), meta))
+    summary = paths.SESSIONS_DIR / session_id / "summary.md"
+    if summary.exists():
+        files.append(folder / f"{safe} 요약.docx")
+        files[1].write_bytes(export.summary_docx(summary.read_text("utf-8"), title))
+    if sys.platform == "win32":
+        os.startfile(folder)  # noqa: S606 - 사용자가 누른 공유 단추로 탐색기 창만 엽니다
+    return {"folder": str(folder), "files": [f.name for f in files]}
+
+
 # ---------------------------------------------------------------- 요약
 def _summary_transcript(session_id: str, segments: list[dict]) -> str:
     meta = session_mod.read_meta(session_id)

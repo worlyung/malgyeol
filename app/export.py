@@ -159,6 +159,32 @@ def summary_docx(summary: str, title: str = "") -> bytes:
     return buf.getvalue()
 
 
+def plain_summary(summary: str) -> str:
+    """AI 요약(마크다운)을 카톡·텔레그램에 붙여넣기 좋은 맨글로. 제목 기호·굵게·구분선을 걷어 냅니다."""
+    out = []
+    for line in summary.splitlines():
+        line = line.rstrip()
+        if re.fullmatch(r"\s*(---+|\*\*\*+|===+)\s*", line):
+            continue
+        if m := re.match(r"^#{1,4}\s+(.*)$", line):
+            line = f"■ {m.group(1)}"
+        elif m := re.match(r"^(\s*)[-*]\s+(.*)$", line):
+            line = f"{m.group(1)}• {m.group(2)}"
+        out.append(line.replace("**", ""))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+def share_text(title: str, info: dict, body: str) -> str:
+    """공유용 글: 머리(회의명·일시·장소·참석자) + 본문."""
+    head = [f"[회의록] {title}".rstrip()]
+    facts = [v for v in (info.get("date"), info.get("place")) if v]
+    if facts:
+        head.append(" · ".join(facts))
+    if info.get("attendees"):
+        head.append(f"참석: {info['attendees']}")
+    return "\n".join(head) + "\n\n" + body.strip() + "\n"
+
+
 def plain_transcript(segments: list[dict]) -> str:
     """요약 모델에 넣을 본문 (시각 + 화자 + 발언)."""
     return "\n".join(

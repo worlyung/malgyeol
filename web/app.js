@@ -1810,6 +1810,52 @@ $$("[data-aexport]").forEach((b) => b.addEventListener("click", () => {
   location.href = `/api/sessions/${S.archive.id}/export?format=${b.dataset.aexport}`;
 }));
 
+// 공유: 보내기는 사람이 직접. 붙여넣을 글을 복사하거나 끌어다 놓을 파일을 준비합니다.
+async function copyOrShow(text, okMsg) {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
+    await navigator.clipboard.writeText(text);
+    toast(okMsg);
+  } catch (e) {                                   // 자동 복사가 막히면 창에 띄워 직접 복사하게
+    // 외부 AI 프롬프트 창을 빌려 쓰므로 제목·안내·단추를 공유용으로 바꿔 둡니다 (닫으면 되돌림)
+    const dlg = $("#externalPromptDialog"), hint = dlg.querySelector("p.hint");
+    const keep = [$("#externalPromptTitle").textContent, hint.textContent, $("#externalPromptCopy").textContent];
+    $("#externalPromptTitle").textContent = "공유할 내용";
+    hint.textContent = "아래 내용을 Ctrl+C로 복사해 카톡·텔레그램·메일에 붙여넣으세요.";
+    $("#externalPromptCopy").textContent = "복사";
+    dlg.addEventListener("close", () => {
+      [$("#externalPromptTitle").textContent, hint.textContent, $("#externalPromptCopy").textContent] = keep;
+    }, { once: true });
+    $("#externalPromptText").value = text;
+    dlg.showModal();
+    $("#externalPromptText").select();
+    toast("자동 복사가 안 됩니다. Ctrl+C로 복사해 주세요.", true);
+  }
+}
+
+$$("[data-share]").forEach((b) => b.addEventListener("click", async () => {
+  const id = S.archive.id;
+  if (!id) return toast("회의를 고르세요", true);
+  if (stillWriting(id)) return toast("받아쓰기가 끝난 뒤에 공유할 수 있습니다.", true);
+  b.closest("details").open = false;
+  const kind = b.dataset.share;
+  try {
+    if (kind === "summary" || kind === "transcript") {
+      const r = await api(`/api/sessions/${encodeURIComponent(id)}/share-text?kind=${kind}`);
+      return copyOrShow(r.text, "복사했습니다. 카톡·텔레그램 대화창에 붙여넣기(Ctrl+V) 하세요.");
+    }
+    const f = await api(`/api/sessions/${encodeURIComponent(id)}/share-files`, { method: "POST" });
+    if (kind === "files") return toast(`파일 ${f.files.length}개를 만든 폴더를 열었습니다. 대화창이나 메일에 끌어다 놓으세요.`);
+    // 메일: 요약이 있으면 본문으로, 없으면 안내만 넣고 녹취록은 첨부 파일로
+    let body = "회의 녹취록을 첨부합니다.";
+    let title = "";
+    try { const r = await api(`/api/sessions/${encodeURIComponent(id)}/share-text?kind=summary`); body = r.text; title = r.title; }
+    catch (e) { title = `[회의록] ${$("#archTitle").textContent}`; }
+    copyOrShow(`제목: ${title}\n\n${body}`,
+      "메일 제목·본문을 복사하고 첨부할 파일 폴더를 열었습니다. 메일 쓰기 창에 붙여넣고 파일을 끌어다 놓으세요.");
+  } catch (e) { toast("공유를 준비하지 못했습니다: " + e.message, true); }
+}));
+
 // 받아쓰는 중이거나 마지막 문장을 정리하는 중인 회의 (지우거나 요약하면 녹취가 빠지거나 파일이 깨질 수 있음)
 function stillWriting(id) { return S.running && !!id && id === S.sessionId; }
 

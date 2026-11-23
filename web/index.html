@@ -276,6 +276,12 @@
           <button type="button" class="find-btn" data-dir="1" title="다음 (Enter)" aria-label="다음 결과">▼</button>
         </div>
         <details class="export-menu"><summary>내보내기 <span>↓</span></summary><div class="export-options"><button data-aexport="docx">Word 문서 <small>DOCX</small></button><button data-aexport="txt">텍스트 <small>TXT</small></button><button data-aexport="srt">영상 자막 <small>SRT</small></button><button data-aexport="md">마크다운 <small>MD</small></button></div></details>
+        <details class="export-menu share-menu"><summary>공유 <span>↗</span></summary><div class="export-options">
+          <button data-share="summary">요약 복사 <small>카톡·텔레그램</small></button>
+          <button data-share="transcript">녹취록 전체 복사 <small>카톡·텔레그램</small></button>
+          <button data-share="files">파일로 보내기 <small>Word</small></button>
+          <button data-share="mail">메일로 보내기 <small>제목·본문 + 파일</small></button>
+        </div></details>
         <button id="summaryBtn" class="primary ai">AI 요약</button>
         <button id="externalSummaryBtn" class="mini" title="회의 정보와 녹취록을 외부 AI용 요약 요청문으로 만듭니다">외부 AI용 프롬프트</button>
       </div>
