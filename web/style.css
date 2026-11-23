@@ -731,6 +731,13 @@ body.is-running .nav-live-dot {
   fill: currentColor;
   stroke: none;
 }
+.pick-file {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--line-strong); background: var(--surface); color: inherit; cursor: pointer;
+}
+.pick-file:hover { border-color: currentColor; }
+.pick-file svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .record-note {
   font-size: 10px;
   color: var(--dim);

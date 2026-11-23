@@ -266,6 +266,7 @@ function applyStatus(st) {
   $("#startBtn").classList.toggle("hidden", S.running);
   $("#startBtn").disabled = S.running || !!S.uploading;
   $("#stopBtn").classList.toggle("hidden", !S.running);
+  $("#pickFileBtn").classList.toggle("hidden", S.running);
   const marks = [];
   if (st.state === "starting") marks.push("준비 중… (음성인식 모델을 불러오는 중)");
   if (st.state === "running") marks.push(st.speaking ? "말하는 중" : "듣는 중");
@@ -748,6 +749,20 @@ function updateSourceFields() {
   $("#sourceHint").textContent = {loopback:"PC에서 재생되는 모든 소리를 받아씁니다. 중계 탭의 소리는 켜 두세요.",microphone:"사용할 마이크를 선택하세요. 주변의 대화도 함께 녹음됩니다.",file:"음성·영상 파일 또는 직접 재생 가능한 영상 주소 중 하나를 입력하세요."}[src];
 }
 $("#source").addEventListener("change", () => { updateSourceFields(); loadDevices(); });
+
+// 녹음 파일 넣기: 실시간 받아쓰기와 함께 가장 많이 쓰는 일이라 드롭다운 밖으로 꺼내 둡니다
+$("#pickFileBtn").addEventListener("click", () => $("#fileInput").click());
+$("#fileInput").addEventListener("change", () => {
+  const f = $("#fileInput").files[0];
+  if (!f) return;
+  if ($("#source").value !== "file") {
+    $("#source").value = "file";
+    $("#source").dispatchEvent(new Event("change"));
+  }
+  if (!$("#title").value.trim()) $("#title").value = f.name.replace(/\.[^.]+$/, "");
+  toast(`파일을 골랐습니다: ${f.name} — 받아쓰기 시작을 누르세요.`);
+  $("#startBtn").focus();
+});
 
 async function loadDevices() {
   const kind = $("#source").value;
