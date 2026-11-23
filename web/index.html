@@ -6,6 +6,20 @@
 <title>말결 · 대화를 기록으로 잇다</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="stylesheet" href="/static/style.css">
+<script>
+// 화면 색: system(컴퓨터 설정 따르기) | light | dark. 이 PC의 말결 창에만 저장합니다.
+(function () {
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  function pref() { try { return localStorage.getItem("mg_theme") || "system"; } catch (e) { return "system"; } }
+  function apply() {
+    var t = pref();
+    document.documentElement.dataset.theme = t === "system" ? (mq.matches ? "dark" : "light") : t;
+  }
+  apply();
+  if (mq.addEventListener) mq.addEventListener("change", apply);
+  window.mgTheme = { get: pref, set: function (v) { try { localStorage.setItem("mg_theme", v); } catch (e) {} apply(); } };
+})();
+</script>
 </head>
 <body>
 <a class="skip-link" href="#tab-live">본문으로 건너뛰기</a>
@@ -23,13 +37,26 @@
     <button class="tab" data-tab="glossary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v16H4zM14 4h6v16h-6zM7 8h1m9 0h1"/></svg><span>용어집</span></button>
     <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>설정</span></button>
   </nav>
-  <div class="nav-note"><span class="local-dot"></span> 내 PC에서 받아쓰기<small>회의 음성을 로컬에 기록합니다.</small></div>
+  <div class="nav-note"><span class="local-dot"></span> 기록은 이 PC에 저장<small>받아쓰기는 설정에서 Soniox·PC 위스퍼 중 고릅니다.</small></div>
   <div class="appbar-end">
     <span id="appVersion" class="version"></span>
     <div id="conn" class="badge off">연결 끊김</div>
   </div>
 </header>
-<div class="workspace-bar"><div><span class="eyebrow">회의 워크스페이스</span><b id="workspaceTitle">받아쓰기</b></div><span class="workspace-tip">대화에 집중하세요. 기록은 여기서.</span><button id="helpBtn" class="quiet">사용 안내 <kbd>?</kbd></button></div>
+<div class="workspace-bar"><div><span class="eyebrow">회의 워크스페이스</span><b id="workspaceTitle">받아쓰기</b></div><span class="workspace-tip">대화에 집중하세요. 기록은 여기서.</span><button id="compactBtn" class="quiet" aria-pressed="false" title="노트북처럼 작은 화면에서 녹취록을 크게 봅니다">간결 보기</button><button id="miniBtn" class="quiet" title="다른 창 위에 작게 떠 있는 자막 창으로 바꿉니다">자막 창</button><button id="helpBtn" class="quiet">사용 안내 <kbd>?</kbd></button></div>
+
+<!-- 자막 창(미니 모드): 최근 문장 몇 줄과 지금 말만 보여 줍니다 -->
+<div id="miniView" class="mini-view" aria-label="자막 창">
+  <div class="mini-head">
+    <span class="mini-dot"></span><b id="miniTitle">말결</b>
+    <span class="spacer"></span>
+    <button id="miniStart" class="mini primary">받아쓰기 시작</button>
+    <button id="miniStop" class="mini danger hidden">마치고 저장</button>
+    <button id="miniExit" class="mini" title="원래 크기로">크게 보기</button>
+  </div>
+  <div id="miniLines" class="mini-lines"></div>
+  <div id="miniPartial" class="mini-partial"></div>
+</div>
 
 <div id="restartBar" class="update-bar restart-bar hidden">
   <span>프로그램 파일이 새로 바뀌었습니다. 새 기능이 제대로 동작하려면 <b>프로그램을 껐다가 다시 켜 주세요.</b></span>
@@ -53,6 +80,10 @@
       <button id="stopBtn" class="orb live hidden" title="중지">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2.5" class="fill"/></svg>
         <span>마치고 저장</span>
+      </button>
+      <button id="pickFileBtn" type="button" class="pick-file" title="녹음·영상 파일을 골라 받아씁니다">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+        녹음 파일 넣기
       </button>
       <span class="record-note">기록은 자동으로 저장됩니다</span>
     </div>
@@ -109,7 +140,7 @@
       <div id="transcript" class="transcript" aria-label="실시간 녹취록" tabindex="0"></div>
       <div class="caption-dock">
         <div id="partial" class="partial"></div>
-        <div class="preview-settings">
+        <div class="preview-settings whisper-only">
           <label class="field-inline">성능
             <select id="setPerf">
               <option value="balanced">보통 — PC 속도에 맞춰 미리보기 (권장)</option>
@@ -324,8 +355,22 @@
       <h2>나에게 맞는 작업 환경.</h2>
       <p><span id="saveMsg" role="status">변경한 설정은 자동으로 저장됩니다.</span></p>
     </div>
-    <nav class="settings-tabs" aria-label="설정 분류"><button class="active" data-setting="ai" aria-pressed="true">AI 연결</button><button data-setting="recognition" aria-pressed="false">음성인식</button><button data-setting="speakers" aria-pressed="false">화자·교정</button><button data-setting="people" aria-pressed="false">등록된 사람</button></nav>
+    <nav class="settings-tabs" aria-label="설정 분류"><button class="active" data-setting="ai" aria-pressed="true">AI 연결</button><button data-setting="recognition" aria-pressed="false">음성인식</button><button data-setting="speakers" aria-pressed="false">화자·교정</button><button data-setting="people" aria-pressed="false">등록된 사람</button><button data-setting="display" aria-pressed="false">화면</button></nav>
     <div class="page-grid">
+      <section class="card span-2 setting-panel hidden" data-setting-panel="display">
+        <div class="card-head"><b>화면</b><span class="count">이 PC의 말결 창에만 적용</span></div>
+        <div class="form">
+          <label>화면 색<select id="setTheme">
+            <option value="system">컴퓨터 설정 따르기</option><option value="light">밝게</option><option value="dark">어둡게 (다크 모드)</option>
+          </select></label>
+          <label>화면 크기<select id="setCompact">
+            <option value="auto">자동 — 창이 작으면 간결 보기</option><option value="on">항상 간결 보기</option><option value="off">항상 넓게 보기</option>
+          </select></label>
+        </div>
+        <div class="hint"><b>간결 보기</b>는 안내 문구를 숨기고, 받아쓰는 동안 준비 칸과 회의 도구를 접어 녹취록을 크게 보여 줍니다.
+          <b>자막 창</b>(위쪽 단추)은 말결을 작은 창으로 줄여 다른 창 위에 띄우고 최근 문장만 보여 줍니다. 노트북 한 대로 화상회의를 하면서 받아쓸 때 쓰세요.</div>
+      </section>
+
       <section class="card span-2 setting-panel" data-setting-panel="ai">
         <div class="card-head"><b>AI 연결</b><span class="count">요약·메모 반영</span></div>
         <div class="hint">요약할 때, 그리고 맥락 화자 구분에서 규칙으로 못 알아본 지명 문장이 있을 때만 그 문장이 외부로 전송됩니다. 받아쓰기는 Soniox(기본)를 쓰면 회의 소리가 Soniox 서버로 전송되고, PC 위스퍼를 고르면 이 PC에서만 처리합니다. 얼굴·목소리·자기소개 구분은 이 PC에서 처리합니다.</div>
@@ -370,7 +415,7 @@
         </div>
       </section>
 
-      <section class="card span-2 setting-panel hidden" data-setting-panel="recognition">
+      <section id="whisperDetail" class="card span-2 setting-panel hidden" data-setting-panel="recognition">
         <div class="card-head"><b>음성인식 세부 (PC 위스퍼)</b></div>
         <div class="hint">
           평소 쓰는 Whisper 모델 폴더를 지정할 수 있습니다. 열 수 없으면 이 프로그램의 기본 모델을 사용합니다.

@@ -538,9 +538,13 @@ class Session:
         from . import config
 
         diarize = not config.elevenlabs_key()
-        self._emit({"type": "log", "message": f"녹음 {len(audio) / SR / 60:.0f}분을 Soniox로 받아쓰는 중..."})
         t0 = time.monotonic()
-        words, spks = self.engine.transcribe_file(audio, diarize=diarize)
+        # 받은 파일 그대로 보낼 수 있으면(로컬 파일·처음부터) 그쪽이 보통 훨씬 작습니다
+        fp = str(self.file_path or "")
+        original = fp if fp and not fp.lower().startswith(("http://", "https://")) and not self.start_sec else None
+        words, spks = self.engine.transcribe_file(
+            audio, diarize=diarize, original=original,
+            progress=lambda m: self._emit({"type": "log", "message": f"녹음 {len(audio) / SR / 60:.0f}분 · {m}"}))
         first = len(self.store.segments)
         for i, w in enumerate(words):
             self._cur_words.append(w)

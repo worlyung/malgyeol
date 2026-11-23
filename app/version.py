@@ -18,7 +18,7 @@ import time
 
 import httpx
 
-VERSION = "1.05"
+VERSION = "1.06"
 PRODUCT = "malgyeol"
 GITLAB = "https://gitlab.aigov.go.kr"
 PROJECT = "soyoung776/livecaption"

@@ -66,6 +66,13 @@ class SonioxTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "키가 맞지 않습니다"):
             e.step()
 
+    def test_timeout_reconnects_instead_of_stopping(self):
+        # 20초 무음(408)·한 연결 300분 한도 같은 오류는 멈추지 않고 다음 소리에서 다시 잇습니다
+        e = SonioxEngine({}, key="k")
+        e._read([json.dumps({"tokens": [], "error_code": 408, "error_message": "Request timeout."})], offset=0.0)
+        self.assertIsNone(e._error)
+        self.assertEqual(e.step(), [])
+
     def test_native_processor_passes_partial(self):
         class Fake:
             began = 0

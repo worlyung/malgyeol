@@ -97,6 +97,8 @@ function handleEvent(e) {
     case "partial":
       if (e.text) window.orbPulse?.(.22);
       showPartial(e.text);
+      S.partialText = e.text || "";
+      renderMini();
       if ($("#autoscroll").checked) scrollBottom();
       break;
     case "status":
@@ -266,8 +268,13 @@ function applyStatus(st) {
   $("#startBtn").classList.toggle("hidden", S.running);
   $("#startBtn").disabled = S.running || !!S.uploading;
   $("#stopBtn").classList.toggle("hidden", !S.running);
+  $("#pickFileBtn").classList.toggle("hidden", S.running);
+  $("#miniStart").classList.toggle("hidden", S.running);
+  $("#miniStop").classList.toggle("hidden", !S.running);
+  renderMini();
   const marks = [];
-  if (st.state === "starting") marks.push("준비 중… (음성인식 모델을 불러오는 중)");
+  if (st.state === "starting") marks.push(document.body.classList.contains("engine-soniox")
+    ? "준비 중… (Soniox 연결 중)" : "준비 중… (음성인식 모델을 불러오는 중)");
   if (st.state === "running") marks.push(st.speaking ? "말하는 중" : "듣는 중");
   if (st.state === "error") marks.push("오류: " + (st.error || ""));
   if (st.state === "finished") marks.push("완료");
@@ -427,6 +434,7 @@ function flushSegments() {
   row.classList.add("seg-new");
   applyColor($("#transcript").appendChild(row));
   if ($("#autoscroll").checked) scrollBottom();
+  renderMini();
   segTimer = setTimeout(flushSegments, segQueue.length ? Math.min(220, 900 / segQueue.length) : 0);
 }
 
@@ -748,6 +756,67 @@ function updateSourceFields() {
   $("#sourceHint").textContent = {loopback:"PC에서 재생되는 모든 소리를 받아씁니다. 중계 탭의 소리는 켜 두세요.",microphone:"사용할 마이크를 선택하세요. 주변의 대화도 함께 녹음됩니다.",file:"음성·영상 파일 또는 직접 재생 가능한 영상 주소 중 하나를 입력하세요."}[src];
 }
 $("#source").addEventListener("change", () => { updateSourceFields(); loadDevices(); });
+
+// ---------------------------------------------------------------- 화면 색 · 간결 보기 · 자막 창
+function compactPref() { try { return localStorage.getItem("mg_compact") || "auto"; } catch (e) { return "auto"; } }
+function applyCompact() {
+  const pref = compactPref();
+  const on = pref === "on" || (pref === "auto" && (innerWidth < 1440 || innerHeight < 820));
+  document.body.classList.toggle("compact", on);
+  $("#compactBtn").setAttribute("aria-pressed", String(on));
+}
+function setCompact(v) { try { localStorage.setItem("mg_compact", v); } catch (e) { /* 저장 불가 */ } applyCompact(); }
+addEventListener("resize", applyCompact);
+applyCompact();
+$("#compactBtn").addEventListener("click", () => {
+  const next = document.body.classList.contains("compact") ? "off" : "on";
+  setCompact(next);
+  $("#setCompact").value = next;
+});
+$("#setCompact").value = compactPref();
+$("#setCompact").addEventListener("change", (e) => setCompact(e.target.value));
+$("#setTheme").value = window.mgTheme?.get() || "system";
+$("#setTheme").addEventListener("change", (e) => window.mgTheme?.set(e.target.value));
+
+// 자막 창: 프로그램 창이면 창 자체를 작게 줄이고 맨 위에 띄웁니다 (브라우저로 열었으면 화면만 바꿈)
+function renderMini() {
+  if (!document.body.classList.contains("mini")) return;
+  const lines = (S.segments || []).slice(-3);
+  $("#miniTitle").textContent = $("#title").value.trim() || "말결";
+  $("#miniLines").innerHTML = lines.length
+    ? lines.map((s) => `<p><b>${escapeHtml(s.speaker || "")}</b> ${escapeHtml(s.text || "")}</p>`).join("")
+    : `<p class="note">${S.running ? "말이 들리면 여기에 자막이 나옵니다." : "받아쓰기를 시작하면 여기에 자막이 나옵니다."}</p>`;
+  const now = S.running ? (S.partialText || "") : "";
+  $("#miniPartial").textContent = now.length > 48 ? "…" + now.slice(-48) : now;
+}
+async function setMini(on) {
+  document.body.classList.toggle("mini", on);
+  renderMini();
+  try { await window.pywebview?.api?.set_mini(on); } catch (e) { /* 창 크기를 못 바꿔도 화면은 바뀜 */ }
+}
+$("#miniBtn").addEventListener("click", () => setMini(true));
+$("#miniExit").addEventListener("click", () => setMini(false));
+$("#miniStart").addEventListener("click", () => $("#startBtn").click());
+$("#miniStop").addEventListener("click", () => $("#stopBtn").click());
+
+// 프로그램 창이 화면보다 크면(노트북) 화면에 맞게 줄입니다
+addEventListener("pywebviewready", () => {
+  window.pywebview.api.fit_screen(screen.availWidth, screen.availHeight).catch(() => {});
+});
+
+// 녹음 파일 넣기: 실시간 받아쓰기와 함께 가장 많이 쓰는 일이라 드롭다운 밖으로 꺼내 둡니다
+$("#pickFileBtn").addEventListener("click", () => $("#fileInput").click());
+$("#fileInput").addEventListener("change", () => {
+  const f = $("#fileInput").files[0];
+  if (!f) return;
+  if ($("#source").value !== "file") {
+    $("#source").value = "file";
+    $("#source").dispatchEvent(new Event("change"));
+  }
+  if (!$("#title").value.trim()) $("#title").value = f.name.replace(/\.[^.]+$/, "");
+  toast(`파일을 골랐습니다: ${f.name} — 받아쓰기 시작을 누르세요.`);
+  $("#startBtn").focus();
+});
 
 async function loadDevices() {
   const kind = $("#source").value;
@@ -1943,6 +2012,10 @@ function fillSettings(cfg) {
   $("#setEngine").value = a.engine === "auto" || a.engine === "soniox" ? "auto" : "whisper";
   $("#setSonioxKey").value = a.soniox_key || "";
   paintWhisper(a.whisper_installed);
+  // PC 위스퍼로 받아쓸 때만 쓰는 칸: 성능(미리보기 간격)·위스퍼 세부 설정
+  const whisperOn = a.engine === "whisper" || a.engine === "faster-whisper" || !a.soniox_key;
+  document.body.classList.toggle("engine-soniox", !whisperOn);
+  $("#whisperDetail").dataset.installed = a.whisper_installed ? "1" : "";
   $("#setWhisperModel").value = a.model === "large-v3-turbo" ? "" : (a.model || "");
   $("#setDeviceType").value = a.device;
   $("#setCompute").value = a.compute_type; $("#setLang").value = a.language;

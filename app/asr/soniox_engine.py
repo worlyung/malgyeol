@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 
 import numpy as np
 
@@ -27,6 +28,12 @@ MODEL = "stt-rt-v6"
 SR = 16000
 FINALIZE_WAIT_SEC = 6.0       # '지금까지 소리 확정' 요청 뒤 기다리는 최대 시간
 MAX_TERMS = 500               # 용어집에서 힌트로 줄 낱말 수 (서버 한도는 8000토큰)
+# Soniox 는 20초 동안 소리가 안 오면 연결을 끊습니다(408). PC 소리(루프백)는 아무 소리도 안 날 때
+# 윈도우가 소리를 아예 넘기지 않아, 회의 중 쉬는 시간에 받아쓰기가 멈췄습니다(실측). 그사이 신호를 보냅니다.
+KEEPALIVE_SEC = 8.0
+# 이 오류들은 다시 이어도 소용없어 받아쓰기를 멈춥니다. 나머지(시간 초과·한 연결 300분 한도·서버 오류)는 다시 잇습니다.
+FATAL_CODES = {400, 401, 402, 403, 429}
+MAX_RECONNECTS_PER_MIN = 4
 
 _ERRORS = {
     401: "Soniox API 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.",
@@ -73,6 +80,8 @@ class SonioxEngine(ASREngine):
         self._error: str | None = None
         self._offset = 0.0         # 연결이 끊겨 다시 이었을 때, 앞 연결에서 보낸 소리 길이
         self._sent = 0.0           # 지금 연결로 보낸 소리 길이(초)
+        self._last_send = 0.0      # 마지막으로 무언가(소리·신호)를 보낸 시각 (time.monotonic)
+        self._reconnects: list[float] = []
 
     # ------------------------------------------------------------ 연결
     def _connect(self) -> None:
@@ -95,9 +104,11 @@ class SonioxEngine(ASREngine):
         ws.send(json.dumps(start, ensure_ascii=False))
         self._ws = ws
         self._sent = 0.0
+        self._last_send = time.monotonic()
         self._reader = threading.Thread(target=self._read, args=(ws, self._offset),
                                          name="soniox-reader", daemon=True)
         self._reader.start()
+        threading.Thread(target=self._keepalive, args=(ws,), name="soniox-keepalive", daemon=True).start()
         log.info("Soniox 연결 (용어 힌트 %d개)", len(terms))
 
     def _read(self, ws, offset: float) -> None:  # noqa: ANN001
@@ -106,9 +117,10 @@ class SonioxEngine(ASREngine):
                 msg = json.loads(raw)
                 if msg.get("error_code"):
                     code = int(msg.get("error_code") or 0)
-                    self._error = _ERRORS.get(code) or f"Soniox 오류 ({code}): {msg.get('error_message', '')}"
-                    log.error("Soniox 오류: %s %s", msg.get("error_type"), msg.get("error_message"))
-                    break
+                    log.warning("Soniox 오류: %s %s %s", code, msg.get("error_type"), msg.get("error_message"))
+                    if code in FATAL_CODES:
+                        self._error = _ERRORS.get(code) or f"Soniox 오류 ({code}): {msg.get('error_message', '')}"
+                    break                       # 그 밖에는 다음 소리를 보낼 때 다시 잇습니다
                 partial = []
                 with self._lock:
                     for tok in msg.get("tokens", []):
@@ -131,6 +143,16 @@ class SonioxEngine(ASREngine):
             self._fin.set()
             if self._ws is ws:
                 self._ws = None         # 다음 소리를 보낼 때 다시 잇습니다
+
+    def _keepalive(self, ws) -> None:  # noqa: ANN001
+        while self._ws is ws:
+            time.sleep(1.0)
+            if self._ws is ws and time.monotonic() - self._last_send > KEEPALIVE_SEC:
+                try:
+                    ws.send(json.dumps({"type": "keepalive"}))
+                    self._last_send = time.monotonic()
+                except Exception:  # noqa: BLE001 - 끊겼으면 읽는 쪽이 정리합니다
+                    return
 
     def _close(self) -> None:
         ws, self._ws = self._ws, None
@@ -158,6 +180,13 @@ class SonioxEngine(ASREngine):
         if self._error:
             raise RuntimeError(self._error)
         if self._ws is None:
+            if self._sent or self._offset:      # 처음이 아니면 다시 잇기
+                now = time.monotonic()
+                self._reconnects = [t for t in self._reconnects if now - t < 60] + [now]
+                if len(self._reconnects) > MAX_RECONNECTS_PER_MIN:
+                    self._error = "Soniox 연결이 계속 끊깁니다. 인터넷 연결을 확인한 뒤 다시 시작해 주세요."
+                    raise RuntimeError(self._error)
+                log.info("Soniox 다시 연결 (지금까지 %.0f초)", self._offset + self._sent)
             self._offset += self._sent          # 끊겼다 다시 이으면 시간이 이어지도록
             self._connect()
         pcm = (np.clip(chunk, -1.0, 1.0) * 32767).astype("<i2").tobytes()
@@ -168,6 +197,7 @@ class SonioxEngine(ASREngine):
             self._ws = None
             return
         self._sent += len(chunk) / SR
+        self._last_send = time.monotonic()
 
     def step(self, final: bool = False) -> list[Word]:
         if final and self._ws is not None:
@@ -196,11 +226,14 @@ class SonioxEngine(ASREngine):
         raise NotImplementedError("Soniox 엔진은 실시간 스트리밍 전용입니다.")
 
     # ------------------------------------------------------------ 녹음 파일 (한 번에)
-    def transcribe_file(self, audio: np.ndarray, diarize: bool = False) -> tuple[list[Word], list[str]]:
+    def transcribe_file(self, audio: np.ndarray, diarize: bool = False, original: str | None = None,
+                        progress=None) -> tuple[list[Word], list[str]]:  # noqa: ANN001
         """녹음 파일은 실시간 연결(실제 속도로만 처리) 대신 파일 전사로 한 번에 받습니다.
 
         실측: 45분 회의 → 41초. 서버에 올린 소리와 결과는 받자마자 지웁니다.
         diarize 면 낱말마다 화자 표시도 함께 돌려줍니다(아니면 빈 문자열).
+        original(받은 녹음 파일 그대로)이 풀어 놓은 소리(WAV)보다 작으면 그것을 보냅니다.
+        m4a·mp3 는 WAV 의 10분의 1 안팎이라 긴 회의도 빨리 올라갑니다. (영상 mp4 는 오히려 커서 WAV 로)
         """
         import io
         import time
@@ -208,13 +241,24 @@ class SonioxEngine(ASREngine):
 
         import httpx
 
+        from pathlib import Path
+
+        say = progress or (lambda _m: None)
         api, h = "https://api.soniox.com/v1", {"Authorization": f"Bearer {self.key}"}
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as w:
-            w.setnchannels(1)
-            w.setsampwidth(2)
-            w.setframerate(SR)
-            w.writeframes((np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes())
+        wav_size = len(audio) * 2 + 44
+        src = Path(original) if original else None
+        if src and src.is_file() and src.stat().st_size < wav_size:
+            upload = (src.name, src.read_bytes(), "application/octet-stream")
+        else:
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(SR)
+                w.writeframes((np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes())
+            upload = ("audio.wav", buf.getvalue(), "audio/wav")
+        say(f"녹음을 Soniox로 올리는 중... ({len(upload[1]) / 1048576:.0f}MB)")
+        log.info("Soniox 파일 전사: %s %.1fMB (WAV면 %.1fMB)", upload[0], len(upload[1]) / 1048576, wav_size / 1048576)
 
         def ok(r):  # noqa: ANN001, ANN202
             if r.status_code >= 400:
@@ -222,8 +266,8 @@ class SonioxEngine(ASREngine):
             return r.json() if r.content else {}
 
         with httpx.Client(timeout=httpx.Timeout(60, write=1800)) as c:
-            fid = ok(c.post(f"{api}/files", headers=h,
-                            files={"file": ("audio.wav", buf.getvalue(), "audio/wav")}))["id"]
+            fid = ok(c.post(f"{api}/files", headers=h, files={"file": upload}))["id"]
+            say("Soniox가 받아쓰는 중...")
             tid = None
             try:
                 body = {"model": MODEL.replace("-rt-", "-async-"), "file_id": fid,
