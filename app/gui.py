@@ -67,6 +67,43 @@ def wait_until_ready(port: int, timeout: float = 30.0) -> bool:
     return False
 
 
+MINI_SIZE = (560, 230)        # 자막 창 크기 (최근 세 문장 + 지금 말)
+
+
+class WindowApi:
+    """화면(JS)에서 부르는 창 조작. window.pywebview.api.* 로 불립니다."""
+
+    def __init__(self) -> None:
+        self._window = None       # 밑줄로 시작해야 pywebview 가 화면 쪽에 내보내지 않습니다
+        self._saved: tuple[int, int] | None = None
+
+    def set_mini(self, on: bool) -> bool:
+        w = self._window
+        if w is None:
+            return False
+        if on:
+            if self._saved is None:
+                self._saved = (w.width, w.height)
+            w.resize(*MINI_SIZE)
+            w.on_top = True
+        else:
+            w.on_top = False
+            if self._saved:
+                w.resize(*self._saved)
+                self._saved = None
+        return True
+
+    def fit_screen(self, avail_w: int, avail_h: int) -> bool:
+        """창이 화면(작업 표시줄 뺀 크기)보다 크면 화면의 92%로 줄입니다. 노트북에서 아래가 잘리지 않게."""
+        w = self._window
+        if w is None or self._saved is not None or not avail_w or not avail_h:
+            return False
+        target = (min(w.width, int(avail_w * 0.92)), min(w.height, int(avail_h * 0.92)))
+        if target != (w.width, w.height):
+            w.resize(*target)
+        return True
+
+
 def main() -> int:
     ensure_output_streams()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s",
@@ -102,11 +139,13 @@ def main() -> int:
 
     # 기본값은 다운로드 차단입니다. 켜야 TXT·DOCX·SRT 내보내기와 음성 파일 받기가 됩니다.
     webview.settings["ALLOW_DOWNLOADS"] = True
-    webview.create_window(
+    bridge = WindowApi()
+    bridge._window = webview.create_window(
         WINDOW_TITLE,
         f"http://127.0.0.1:{port}",
-        width=1280, height=880, min_size=(900, 640),
+        width=1280, height=880, min_size=MINI_SIZE,      # 자막 창으로 줄일 수 있게 최소 크기를 낮춤
         confirm_close=False,
+        js_api=bridge,
     )
     icon = paths.ROOT / "assets" / "icon.ico"
     webview.start(
