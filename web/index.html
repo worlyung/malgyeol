@@ -140,7 +140,7 @@
       <div id="transcript" class="transcript" aria-label="실시간 녹취록" tabindex="0"></div>
       <div class="caption-dock">
         <div id="partial" class="partial"></div>
-        <div class="preview-settings">
+        <div class="preview-settings whisper-only">
           <label class="field-inline">성능
             <select id="setPerf">
               <option value="balanced">보통 — PC 속도에 맞춰 미리보기 (권장)</option>
@@ -415,7 +415,7 @@
         </div>
       </section>
 
-      <section class="card span-2 setting-panel hidden" data-setting-panel="recognition">
+      <section id="whisperDetail" class="card span-2 setting-panel hidden" data-setting-panel="recognition">
         <div class="card-head"><b>음성인식 세부 (PC 위스퍼)</b></div>
         <div class="hint">
           평소 쓰는 Whisper 모델 폴더를 지정할 수 있습니다. 열 수 없으면 이 프로그램의 기본 모델을 사용합니다.

@@ -2845,6 +2845,21 @@ body.is-running .mini-dot {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
+}
+
+/* Soniox 로 받아쓸 때는 PC 위스퍼 전용 칸을 숨깁니다 */
+body.engine-soniox .whisper-only {
+  display: none;
+}
+#whisperDetail:not([data-installed="1"]) {
+  display: none !important;
+}
+
+/* 다크 모드: 화자 색을 어두운 바탕에 맞게 낮춥니다 */
+:root[data-theme="dark"] .seg .av {
+  background: color-mix(in srgb, var(--sp-fg, #8a96a0) 32%, var(--surface));
+  color: color-mix(in srgb, var(--sp-fg, #8a96a0) 40%, #ffffff);
+}
+:root[data-theme="dark"] .seg .sp {
+  color: color-mix(in srgb, var(--sp-fg, #8a96a0) 45%, #ffffff);
 }

@@ -144,7 +144,8 @@ class AppState:
         if self.engine is None or key != self._engine_key:
             from .asr import build_engine
 
-            self.publish({"type": "log", "message": "음성인식 모델 로딩 중..."})
+            soniox = acfg.get("engine", "auto") in {"auto", "soniox"} and bool(config.soniox_key())
+            self.publish({"type": "log", "message": "Soniox 연결 준비 중..." if soniox else "음성인식 모델 로딩 중..."})
             try:
                 engine = build_engine(acfg)
                 engine.warmup()
@@ -157,7 +158,7 @@ class AppState:
                 engine.warmup()
             self.engine = engine
             self._engine_key = key
-            self.publish({"type": "log", "message": f"모델 준비 완료: {getattr(self.engine, 'model_name', '')}"})
+            self.publish({"type": "log", "message": f"받아쓰기 준비 완료: {getattr(self.engine, 'model_name', '')}"})
         return self.engine
 
     # --- 이벤트 전달 (작업 스레드 -> 브라우저) ---

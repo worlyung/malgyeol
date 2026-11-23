@@ -273,7 +273,8 @@ function applyStatus(st) {
   $("#miniStop").classList.toggle("hidden", !S.running);
   renderMini();
   const marks = [];
-  if (st.state === "starting") marks.push("준비 중… (음성인식 모델을 불러오는 중)");
+  if (st.state === "starting") marks.push(document.body.classList.contains("engine-soniox")
+    ? "준비 중… (Soniox 연결 중)" : "준비 중… (음성인식 모델을 불러오는 중)");
   if (st.state === "running") marks.push(st.speaking ? "말하는 중" : "듣는 중");
   if (st.state === "error") marks.push("오류: " + (st.error || ""));
   if (st.state === "finished") marks.push("완료");
@@ -785,7 +786,8 @@ function renderMini() {
   $("#miniLines").innerHTML = lines.length
     ? lines.map((s) => `<p><b>${escapeHtml(s.speaker || "")}</b> ${escapeHtml(s.text || "")}</p>`).join("")
     : `<p class="note">${S.running ? "말이 들리면 여기에 자막이 나옵니다." : "받아쓰기를 시작하면 여기에 자막이 나옵니다."}</p>`;
-  $("#miniPartial").textContent = S.running ? (S.partialText || "") : "";
+  const now = S.running ? (S.partialText || "") : "";
+  $("#miniPartial").textContent = now.length > 48 ? "…" + now.slice(-48) : now;
 }
 async function setMini(on) {
   document.body.classList.toggle("mini", on);
@@ -2010,6 +2012,10 @@ function fillSettings(cfg) {
   $("#setEngine").value = a.engine === "auto" || a.engine === "soniox" ? "auto" : "whisper";
   $("#setSonioxKey").value = a.soniox_key || "";
   paintWhisper(a.whisper_installed);
+  // PC 위스퍼로 받아쓸 때만 쓰는 칸: 성능(미리보기 간격)·위스퍼 세부 설정
+  const whisperOn = a.engine === "whisper" || a.engine === "faster-whisper" || !a.soniox_key;
+  document.body.classList.toggle("engine-soniox", !whisperOn);
+  $("#whisperDetail").dataset.installed = a.whisper_installed ? "1" : "";
   $("#setWhisperModel").value = a.model === "large-v3-turbo" ? "" : (a.model || "");
   $("#setDeviceType").value = a.device;
   $("#setCompute").value = a.compute_type; $("#setLang").value = a.language;
