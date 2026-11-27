@@ -69,6 +69,11 @@ DEFAULTS: dict[str, Any] = {
         "keywords": [],                   # 관심 키워드 (담당 사업명·소속 부서명 등)
         "os_notify": True,                # Windows 알림 (녹음에 섞이지 않도록 소리는 내지 않습니다)
     },
+    "vault": {
+        # 회의가 끝나면 옵시디언 볼트(또는 아무 폴더)에 회의록 노트(.md)를 저장합니다
+        "enabled": False,
+        "folder": "",
+    },
     "export": {
         "timestamp": True,
         "speaker": True,

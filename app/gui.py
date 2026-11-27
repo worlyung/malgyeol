@@ -93,6 +93,16 @@ class WindowApi:
                 self._saved = None
         return True
 
+    def pick_folder(self) -> str:
+        """폴더 고르기 창 (옵시디언 볼트 저장 위치)."""
+        import webview
+
+        w = self._window
+        if w is None:
+            return ""
+        got = w.create_file_dialog(webview.FOLDER_DIALOG)
+        return got[0] if got else ""
+
     def fit_screen(self, avail_w: int, avail_h: int) -> bool:
         """창이 화면(작업 표시줄 뺀 크기)보다 크면 화면의 92%로 줄입니다. 노트북에서 아래가 잘리지 않게."""
         w = self._window

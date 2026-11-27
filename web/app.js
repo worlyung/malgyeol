@@ -1909,6 +1909,10 @@ $$("[data-share]").forEach((b) => b.addEventListener("click", async () => {
   b.closest("details").open = false;
   const kind = b.dataset.share;
   try {
+    if (kind === "vault") {
+      const r = await api(`/api/sessions/${encodeURIComponent(id)}/vault`, { method: "POST" });
+      return toast(`노트로 저장했습니다: ${r.name}`);
+    }
     if (kind === "summary" || kind === "transcript") {
       const r = await api(`/api/sessions/${encodeURIComponent(id)}/share-text?kind=${kind}`);
       return copyOrShow(r.text, "복사했습니다. 카톡·텔레그램 대화창에 붙여넣기(Ctrl+V) 하세요.");
@@ -2009,6 +2013,8 @@ function fillSettings(cfg) {
   if (!S.running) { S.liveModes = null; }
   setTimeout(() => { paintModes("live"); paintModes("archive"); });
   const a = cfg.asr, sp = cfg.speaker, g = cfg.glossary, su = cfg.summary;
+  $("#setVaultOn").checked = !!cfg.vault?.enabled;
+  $("#setVaultFolder").value = cfg.vault?.folder || "";
   $("#setEngine").value = a.engine === "auto" || a.engine === "soniox" ? "auto" : "whisper";
   $("#setSonioxKey").value = a.soniox_key || "";
   paintWhisper(a.whisper_installed);
@@ -2052,7 +2058,7 @@ async function loadMonitors(sel) {
 const SETTING_IDS = ["setPerf", "setWhisperModel", "setDeviceType", "setCompute", "setLang",
                      "setSilence", "setBeam", "setThreads", "setLowPrio", "setFace", "setMonitor",
                      "setFaceTh", "setVoice", "setVoiceTh", "setAutoEnroll", "setContext", "setCorrect", "setCorrectTh", "setProvider",
-                     "setKey", "setSumModel", "setElevenKey", "setEngine", "setSonioxKey"];
+                     "setKey", "setSumModel", "setElevenKey", "setEngine", "setSonioxKey", "setVaultOn", "setVaultFolder"];
 
 function collectSettings() {
   const num = (id) => parseFloat($(id).value);
@@ -2080,6 +2086,7 @@ function collectSettings() {
     glossary: {
       correction_enabled: $("#setCorrect").checked, correction_threshold: num("#setCorrectTh"),
     },
+    vault: { enabled: $("#setVaultOn").checked, folder: $("#setVaultFolder").value.trim() },
     summary: {
       provider: $("#setProvider").value, model: $("#setSumModel").value.trim(),
       api_key: $("#setKey").value,
@@ -2299,6 +2306,14 @@ $("#keyClose").addEventListener("click", () => $("#keyModal").classList.add("hid
 $("#keyGuide").addEventListener("click", openKeyGuide);
 $("#openKeyGuide").addEventListener("click", openKeyGuide);
 $("#installWhisper").addEventListener("click", installWhisper);
+$("#pickVaultFolder").addEventListener("click", async () => {
+  if (!window.pywebview?.api?.pick_folder) return toast("폴더 경로를 칸에 직접 붙여넣어 주세요.", true);
+  const p = await window.pywebview.api.pick_folder();
+  if (!p) return;
+  $("#setVaultFolder").value = p;
+  $("#setVaultFolder").dispatchEvent(new Event("input", { bubbles: true }));
+  $("#setVaultFolder").dispatchEvent(new Event("change", { bubbles: true }));
+});
 $("#keyGoSettings").addEventListener("click", () => {
   $("#keyModal").classList.add("hidden");
   showTab("settings");
