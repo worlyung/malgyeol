@@ -396,12 +396,12 @@
             <option value="clova">네이버 Clova Studio (공공)</option>
           </select></label>
           <label id="setKeyRow">API 키<input id="setKey" type="password" placeholder="Gemini API 키"></label>
-          <label>모델(비우면 기본값)<input id="setSumModel" list="sumModels" placeholder="gemini-3.1-flash-lite"></label>
-          <datalist id="sumModels"></datalist>
+          <label>모델<select id="setSumModelSel"></select></label>
+          <label id="sumModelCustom" class="hidden">모델 이름 직접 입력<input id="setSumModel" placeholder="제공자의 모델 이름" autocomplete="off"></label>
         </div>
-        <div class="row">
-          <span id="keyState" class="hint"></span>
+        <div id="aiStatus" class="ai-status"><b id="aiStatusText">확인 중…</b><span id="keyState" class="hint"></span>
           <span class="spacer"></span>
+          <button id="aiTestBtn" class="mini">연결 시험</button>
           <button id="openKeyGuide" class="mini">API 키 연결 안내 ↗</button>
         </div>
       </section>

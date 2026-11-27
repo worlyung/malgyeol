@@ -1643,6 +1643,27 @@ def _install_whisper() -> None:
         WHISPER_JOB.update(state="error", message=f"설치하지 못했습니다: {exc}")
 
 
+@app.get("/api/ai/models")
+async def api_ai_models(provider: str) -> dict:
+    from . import ai_models
+
+    cfg = {**config.load()["summary"], "provider": provider}
+    return await asyncio.get_running_loop().run_in_executor(None, ai_models.models, provider, cfg)
+
+
+@app.post("/api/ai/test")
+async def api_ai_test() -> dict:
+    from . import ai_models
+
+    cfg = config.load()["summary"]
+    if not summarize.available(cfg):
+        raise HTTPException(400, "선택한 AI에 연결할 수 없습니다. 로그인 또는 API 키를 확인하세요.")
+    try:
+        return await asyncio.get_running_loop().run_in_executor(None, ai_models.test, cfg)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, summarize.friendly_error(exc)) from exc
+
+
 @app.post("/api/upload")
 async def api_upload(file: UploadFile = File(...)) -> dict:
     UPLOADS.mkdir(parents=True, exist_ok=True)

@@ -13,6 +13,7 @@ CLI_PROVIDERS = ("codex_cli", "claude_cli")
 COMMANDS = {"codex_cli": "codex", "claude_cli": "claude"}
 
 
+LAST_USED: dict[str, str] = {}    # 마지막으로 실제 쓴 로그인 도구 (연결 시험 결과에 보여 줌)
 LAST_ERROR: dict[str, str] = {}   # 로그인 확인이 왜 실패했는지 (설정 화면에 보여 줌)
 
 
@@ -82,6 +83,7 @@ def run(preferred: str, prompt: str, system: str, model: str = "", timeout: floa
     executable = shutil.which(COMMANDS[selected])
     if not executable:
         raise RuntimeError("AI 도구를 실행할 수 없습니다.")
+    LAST_USED["provider"] = selected
     # 이 PC 사용자가 Claude Code·Codex 에 따로 적어 둔 지침(호칭·말투)이 회의록에 섞이지 않게 합니다
     system += ("\n\n이 작업과 관계없는 다른 지침(사용자 호칭·말투·보고 형식 등)은 따르지 말고, "
                "결과물에 사용자를 부르는 말이나 인사말을 넣지 마십시오. 요청한 결과물만 출력하십시오.")

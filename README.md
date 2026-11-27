@@ -9,7 +9,7 @@ Windows에서 PC 소리·마이크·음성 파일을 받아 적고, 녹취록을
 
 [말결 설치 파일 받기](https://github.com/worlyung/malgyeol/releases/latest)
 
-1. 릴리스의 **Malgyeol-1.07-Setup.exe**를 다운로드합니다.
+1. 릴리스의 **Malgyeol-1.08-Setup.exe**를 다운로드합니다.
 2. 설치 EXE를 실행하고 설치할 폴더를 선택합니다.
 3. 설치가 끝나면 **실행**을 누르거나 바탕화면의 **말결** 바로가기를 엽니다.
 

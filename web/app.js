@@ -2037,8 +2037,9 @@ function fillSettings(cfg) {
   $("#setElevenKey").value = sp.elevenlabs_key || "";
   const r = sp.face_region || [];
   $("#setCorrect").checked = g.correction_enabled; $("#setCorrectTh").value = g.correction_threshold;
-  $("#setProvider").value = su.provider; $("#setSumModel").value = su.model || "";
+  $("#setProvider").value = su.provider;
   paintProvider();
+  loadModels(su.model || "");
   paintKeyState();
   $("#setKey").value = su.api_key || "";
   loadMonitors(sp.face_monitor);
@@ -2058,7 +2059,7 @@ async function loadMonitors(sel) {
 const SETTING_IDS = ["setPerf", "setWhisperModel", "setDeviceType", "setCompute", "setLang",
                      "setSilence", "setBeam", "setThreads", "setLowPrio", "setFace", "setMonitor",
                      "setFaceTh", "setVoice", "setVoiceTh", "setAutoEnroll", "setContext", "setCorrect", "setCorrectTh", "setProvider",
-                     "setKey", "setSumModel", "setElevenKey", "setEngine", "setSonioxKey", "setVaultOn", "setVaultFolder"];
+                     "setKey", "setSumModel", "setElevenKey", "setEngine", "setSonioxKey", "setVaultOn", "setVaultFolder", "setSumModelSel"];
 
 function collectSettings() {
   const num = (id) => parseFloat($(id).value);
@@ -2088,7 +2089,7 @@ function collectSettings() {
     },
     vault: { enabled: $("#setVaultOn").checked, folder: $("#setVaultFolder").value.trim() },
     summary: {
-      provider: $("#setProvider").value, model: $("#setSumModel").value.trim(),
+      provider: $("#setProvider").value, model: currentSumModel(),
       api_key: $("#setKey").value,
     },
   };
@@ -2096,11 +2097,11 @@ function collectSettings() {
 
 // 제공자마다 고를 수 있는 모델 (모델 칸을 누르면 목록이 나옵니다. 직접 입력도 됩니다)
 const PROVIDER_MODELS = {
-  claude_cli: { key: "", models: [] },
+  claude_cli: { key: "", models: [["opus", "Opus — 가장 똑똑함"], ["sonnet", "Sonnet — 균형 (권장)"], ["haiku", "Haiku — 빠르고 가벼움"]] },
   codex_cli: { key: "", models: [] },
-  gemini: { key: "Gemini API 키", models: ["gemini-3.1-flash-lite"] },
-  anthropic: { key: "sk-ant-...", models: ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"] },
-  openai: { key: "sk-...", models: ["gpt-4.1", "gpt-4.1-mini"] },
+  gemini: { key: "Gemini API 키", models: [["gemini-pro-latest", "Gemini Pro (최신)"], ["gemini-flash-latest", "Gemini Flash (최신)"]] },
+  anthropic: { key: "sk-ant-...", models: [["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]] },
+  openai: { key: "sk-...", models: [] },
   clova: {
     key: "Clova Studio GOV API 키",
     models: [
@@ -2113,22 +2114,67 @@ const PROVIDER_MODELS = {
   },
 };
 
+// 모델: 목록에서 고르거나 '직접 입력'. 목록은 제공자에게 물어 받아 옵니다(못 받으면 기본 목록)
+function currentSumModel() {
+  return $("#setSumModelSel").value === "__custom" ? $("#setSumModel").value.trim() : $("#setSumModelSel").value;
+}
+function fillModelSelect(models, saved) {
+  const sel = $("#setSumModelSel");
+  const known = models.some((m) => m.id === saved);
+  sel.innerHTML = `<option value="">기본값 (제공자가 정한 모델)</option>` +
+    models.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label || m.id)}</option>`).join("") +
+    `<option value="__custom">직접 입력…</option>`;
+  sel.value = !saved ? "" : known ? saved : "__custom";
+  $("#setSumModel").value = sel.value === "__custom" ? saved : "";
+  $("#sumModelCustom").classList.toggle("hidden", sel.value !== "__custom");
+}
+let modelReq = 0;
+async function loadModels(saved) {
+  const provider = $("#setProvider").value;
+  const p = PROVIDER_MODELS[provider] || { models: [] };
+  const fallback = p.models.map((m) => (Array.isArray(m) ? { id: m[0], label: m[1] } : { id: m, label: m }));
+  fillModelSelect(fallback, saved);
+  const mine = ++modelReq;
+  try {
+    const r = await api(`/api/ai/models?provider=${encodeURIComponent(provider)}`);
+    if (mine === modelReq && r.models?.length) fillModelSelect(r.models, currentSumModel() || saved);
+  } catch (e) { /* 기본 목록으로 둡니다 */ }
+  paintKeyState();
+}
+$("#setSumModelSel").addEventListener("change", () => {
+  const custom = $("#setSumModelSel").value === "__custom";
+  $("#sumModelCustom").classList.toggle("hidden", !custom);
+  if (custom) $("#setSumModel").focus();
+  paintKeyState();
+});
+
 function paintProvider() {
   const p = PROVIDER_MODELS[$("#setProvider").value] || PROVIDER_MODELS.gemini;
   const login = ["claude_cli", "codex_cli"].includes($("#setProvider").value);
   $("#setKeyRow").classList.toggle("hidden", login);
   $("#openKeyGuide").classList.toggle("hidden", login);
-  const list = p.models.map((m) => (Array.isArray(m) ? m : [m, ""]));
-  $("#sumModels").innerHTML = list.map(([id, label]) =>
-    `<option value="${escapeHtml(id)}"${label ? ` label="${escapeHtml(label)}"` : ""}></option>`).join("");
-  $("#setSumModel").placeholder = login ? "비우면 로그인 도구의 기본 모델" : list[0][0];
   if (!$("#setKey").value) $("#setKey").placeholder = p.key;
 }
 
+$("#aiTestBtn").addEventListener("click", async () => {
+  const b = $("#aiTestBtn");
+  b.disabled = true;
+  $("#aiStatusText").textContent = "⏳ 연결 시험 중…";
+  try {
+    const r = await api("/api/ai/test", { method: "POST" });
+    const used = { claude_cli: "Claude Code", codex_cli: "Codex" }[r.used] || "";
+    $("#aiStatusText").textContent = `✅ 응답 확인 (${r.seconds}초)${used ? ` · ${used} 로그인으로 연결됨` : ""}`;
+    $("#aiStatus").classList.remove("bad");
+  } catch (e) {
+    $("#aiStatusText").textContent = "⚠️ 연결 실패 — " + e.message;
+    $("#aiStatus").classList.add("bad");
+  } finally { b.disabled = false; }
+});
+
 // 제공자를 바꾸면 이전 제공자의 모델 이름은 맞지 않으므로 비웁니다.
 $("#setProvider").addEventListener("change", () => {
-  $("#setSumModel").value = "";
   paintProvider();
+  loadModels("");
   paintKeyState();
 });
 
@@ -2271,6 +2317,13 @@ function paintKeyState() {
             + (S.settings?.summary?.ai_reason ? ` (확인 실패 이유: ${S.settings.summary.ai_reason})` : ""))
     : (ok ? "API 키가 연결되어 있습니다." : "API 키가 아직 없습니다.");
   el.className = "hint " + (ok ? "ok" : "missing");
+  if (ok) el.textContent = "";            // 연결되면 위의 '✅ 연결됨' 한 줄로 충분합니다
+  const name = $("#setProvider").selectedOptions[0]?.textContent.replace(" (기본)", "") || "";
+  const model = currentSumModel();
+  $("#aiStatusText").textContent = ok
+    ? `✅ 연결됨 — ${name}${model ? ` · ${model}` : " · 기본 모델"}`
+    : "⚠️ 연결 안 됨";
+  $("#aiStatus").classList.toggle("bad", !ok);
 }
 
 // PC 위스퍼(선택 설치) 상태와 설치 단추

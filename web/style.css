@@ -2863,3 +2863,26 @@ body.engine-soniox .whisper-only {
 :root[data-theme="dark"] .seg .sp {
   color: color-mix(in srgb, var(--sp-fg, #8a96a0) 45%, #ffffff);
 }
+
+/* AI 연결 상태 줄 */
+.ai-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  background: var(--good-soft);
+  border: 1px solid var(--line);
+}
+.ai-status b {
+  font-size: 14px;
+  color: var(--good);
+}
+.ai-status.bad {
+  background: var(--warn-soft);
+}
+.ai-status.bad b {
+  color: var(--warn);
+}
