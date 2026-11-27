@@ -7,7 +7,7 @@ from app import version
 
 class BrandVersionTests(unittest.TestCase):
     def test_brand_version(self):
-        self.assertEqual(version.VERSION, "1.07")
+        self.assertEqual(version.VERSION, "1.08")
         self.assertEqual(version.parse("1.00"), (1, 0, 0))
         self.assertGreater(version.parse("1.02"), version.parse("1.01"))
 
