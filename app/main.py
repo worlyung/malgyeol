@@ -164,6 +164,7 @@ class AppState:
     # --- 이벤트 전달 (작업 스레드 -> 브라우저) ---
     def publish(self, event: dict) -> None:
         self.events.put(event)
+        _maybe_save_vault(event)
         st = event.get("status") if event.get("type") == "status" else None
         if st and st.get("state") == "finished" and st.get("id") and st["id"] not in self.memo_done:
             self.memo_done.add(st["id"])
@@ -193,6 +194,51 @@ class AppState:
 
 
 state = AppState()
+_vault_saved: set[str] = set()
+
+
+def _maybe_save_vault(event: dict) -> None:
+    """회의가 끝났을 때, 요약·메모 반영이 끝났을 때 볼트 노트를 새로 씁니다 (설정에서 켰을 때만)."""
+    kind, sid = event.get("type"), event.get("session_id")
+    if kind == "status":
+        st = event.get("status") or {}
+        if st.get("state") != "finished" or not st.get("id") or st["id"] in _vault_saved:
+            return
+        sid = st["id"]
+        _vault_saved.add(sid)
+    elif kind not in {"summary_done", "memo_done"} or not sid:
+        return
+    if not (config.load().get("vault") or {}).get("enabled"):
+        return
+    threading.Thread(target=_save_vault, args=(sid,), name="vault-save", daemon=True).start()
+
+
+def _save_vault(session_id: str) -> None:
+    from . import vault
+
+    try:
+        p = vault.save(session_id)
+        if p:
+            state.events.put({"type": "log", "message": f"회의록 노트를 저장했습니다: {p.name}"})
+    except Exception as exc:  # noqa: BLE001 - 볼트 저장이 안 돼도 받아쓰기 기록은 그대로입니다
+        log.warning("볼트 저장 실패: %s", exc)
+        state.events.put({"type": "log", "message": f"회의록 노트를 저장하지 못했습니다: {exc}"})
+
+
+@app.post("/api/sessions/{session_id}/vault")
+async def api_save_vault(session_id: str) -> dict:
+    """기록·요약 → 공유 → 볼트에 저장 (설정에서 자동 저장을 꺼 두었어도 저장)."""
+    from . import vault
+
+    if state.session and state.session.id == session_id and state.session.state in {"running", "stopping"}:
+        raise HTTPException(400, "받아쓰기가 끝난 뒤에 저장할 수 있습니다.")
+    try:
+        p = await asyncio.get_running_loop().run_in_executor(None, lambda: vault.save(session_id, force=True))
+    except RuntimeError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not p:
+        raise HTTPException(400, "저장할 녹취록이 없습니다.")
+    return {"path": str(p), "name": p.name}
 
 # 여러 사람에게 똑같이 들어간(누구 것인지 알 수 없는) 성문은 켤 때마다 정리합니다. (지운 것은 백업)
 try:
@@ -671,6 +717,8 @@ def _elevenlabs(session_id: str) -> dict:
             store.segments = new
             store.save(force=True)
         session_mod.save_meta(session_id, {"segments": len(new)})
+        if (config.load().get("vault") or {}).get("enabled"):
+            threading.Thread(target=_save_vault, args=(session_id,), daemon=True).start()
         speakers = sorted({s.speaker for s in new}, key=lambda x: int(x.split()[-1]))
         return {"ok": True, "segments": len(new), "speakers": speakers}
     finally:
